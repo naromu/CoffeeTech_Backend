@@ -7,8 +7,6 @@ load_dotenv()
 
 def send_verification_email(email, token):
     
-
-    
     #smtp_user = 'coffeetech361@zohomail.com'
     #smtp_pass = 'CoffeTech123' # Usa la contraseña de aplicación si tienes 2FA habilitado
     
