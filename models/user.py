@@ -15,3 +15,20 @@ class User:
             user_id = cursor.fetchone()[0]
             conn.commit()
             return user_id
+        
+#############
+def update(self, conn, new_name=None, new_email=None):
+        with conn.cursor() as cursor:
+            if new_name:
+                cursor.execute('UPDATE "user" SET name = %s WHERE email = %s', (new_name, self.email))
+            if new_email:
+                cursor.execute('UPDATE "user" SET email = %s WHERE email = %s', (new_email, self.email))
+            conn.commit()
+
+def delete(self, conn):
+        with conn.cursor() as cursor:
+            cursor.execute('DELETE FROM "user" WHERE email = %s', (self.email,))
+            conn.commit()
+
+
+        

@@ -38,3 +38,30 @@ def send_verification_email(email, token):
             print("Correo enviado exitosamente")
     except Exception as e:
         print(f"Error al enviar correo: {e}")
+########
+def send_reset_email(email, token):
+    smtp_user = os.getenv("SMTPP_USER")
+    smtp_pass = os.getenv("SMTPP_PASS")
+
+    if not smtp_user or not smtp_pass:
+        print("Error: Las credenciales SMTP no están configuradas correctamente.")
+        return
+
+    smtp_host = "smtp.zoho.com"
+    smtp_port = 465  # Usar SSL en el puerto 465
+
+    subject = "Restablecimiento de Contraseña"
+    body = f"Hola,\n\nUtiliza el siguiente token para restablecer tu contraseña: {token}\n\nGracias."
+
+    msg = MIMEText(body, "plain")
+    msg["Subject"] = subject
+    msg["From"] = smtp_user
+    msg["To"] = email
+
+    try:
+        with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, email, msg.as_string())
+            print("Correo de restablecimiento enviado exitosamente")
+    except Exception as e:
+        print(f"Error al enviar correo de restablecimiento: {e}")
