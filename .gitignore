@@ -3,3 +3,5 @@ env
 # Ignorar carpetas __pycache__ generadas por Python
 __pycache__/
 *.pyc
+# .gitignore
+venv/
