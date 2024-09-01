@@ -2,6 +2,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
+#carga
 
 # Cargar variables de entorno desde el archivo .env
 load_dotenv()
