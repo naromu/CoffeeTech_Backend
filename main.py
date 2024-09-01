@@ -1,5 +1,10 @@
 from fastapi import FastAPI
-from routes import auth
+from endpoints import auth
+from dataBase import engine
+from models.user import Base
+
+# Crear todas las tablas
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 

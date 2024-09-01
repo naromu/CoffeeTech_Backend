@@ -1,34 +1,16 @@
-class User:
-    def __init__(self, name: str, email: str, password_hash: str, verification_token: str):
-        self.name = name
-        self.email = email
-        self.password_hash = password_hash
-        self.verification_token = verification_token
+from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy.orm import declarative_base
 
-    def save(self, conn):
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO "user" (name, email, password_hash, verification_token)
-                VALUES (%s, %s, %s, %s)
-                RETURNING user_id;
-            """, (self.name, self.email, self.password_hash, self.verification_token))
-            user_id = cursor.fetchone()[0]
-            conn.commit()
-            return user_id
-        
-#############
-def update(self, conn, new_name=None, new_email=None):
-        with conn.cursor() as cursor:
-            if new_name:
-                cursor.execute('UPDATE "user" SET name = %s WHERE email = %s', (new_name, self.email))
-            if new_email:
-                cursor.execute('UPDATE "user" SET email = %s WHERE email = %s', (new_email, self.email))
-            conn.commit()
+Base = declarative_base()
 
-def delete(self, conn):
-        with conn.cursor() as cursor:
-            cursor.execute('DELETE FROM "user" WHERE email = %s', (self.email,))
-            conn.commit()
+class User(Base):
+    __tablename__ = "user"
 
+    user_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    verification_token = Column(String, unique=True)
+    is_verified = Column(Boolean, default=False)
 
-        
+    # Métodos adicionales (como save, update, delete) no son necesarios con SQLAlchemy.
