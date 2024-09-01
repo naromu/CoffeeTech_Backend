@@ -8,4 +8,4 @@ app.include_router(auth.router)
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the FastAPI application!"}
+    return {"message": "Welcome to the FastAPI application CoffeeTech!"}

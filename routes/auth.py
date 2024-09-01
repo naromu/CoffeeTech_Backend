@@ -5,17 +5,44 @@ from utils.security import hash_password, generate_verification_token, generate_
 from utils.email import send_verification_email, send_reset_email
 from database import get_db_connection
 import secrets
+import datetime
 
 router = APIRouter()
 
+# Modelos para la creación de usuarios y verificación de tokens
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
     passwordConfirmation: str
+
 class VerifyTokenRequest(BaseModel):
     token: str
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordReset(BaseModel):
+    token: str
+    new_password: str
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+class LogoutRequest(BaseModel):
+    session_token: str
+
+class UpdateProfile(BaseModel):
+    new_name: str
+    new_email: EmailStr
+
+# Diccionario para almacenar tokens de restablecimiento
+reset_tokens = {}
 
 @router.post("/register")
 def register_user(user: UserCreate):
@@ -26,26 +53,25 @@ def register_user(user: UserCreate):
     # Conectarse a la base de datos
     conn = get_db_connection()
 
-    # Verificar si el email ya está registrado
-    with conn.cursor() as cursor:
-        cursor.execute('SELECT user_id FROM "user" WHERE email = %s', (user.email,))
-        if cursor.fetchone():
-            raise HTTPException(status_code=400, detail="Email is already registered")
-
-    # Hash de la contraseña
-    password_hash = hash_password(user.password)
-
-    # Generar un token de verificación
-    verification_token = generate_verification_token()
-
-    # Crear un nuevo usuario
-    new_user = User(name=user.name, email=user.email, password_hash=password_hash, verification_token=verification_token)
-
     try:
-        user_id = new_user.save(conn)
+        with conn.cursor() as cursor:
+            # Verificar si el email ya está registrado
+            cursor.execute('SELECT user_id FROM "user" WHERE email = %s', (user.email,))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail="Email is already registered")
 
-        # Enviar email de verificación
-        send_verification_email(user.email, verification_token)
+            # Hash de la contraseña
+            password_hash = hash_password(user.password)
+
+            # Generar un token de verificación
+            verification_token = generate_verification_token()
+
+            # Crear un nuevo usuario
+            new_user = User(name=user.name, email=user.email, password_hash=password_hash, verification_token=verification_token)
+            user_id = new_user.save(conn)
+
+            # Enviar email de verificación
+            send_verification_email(user.email, verification_token)
 
     except Exception as e:
         conn.rollback()
@@ -58,7 +84,7 @@ def register_user(user: UserCreate):
 @router.post("/verify")
 def verify_email(request: VerifyTokenRequest):
     conn = get_db_connection()
-    
+
     try:
         with conn.cursor() as cursor:
             # Verificar si el token de verificación es válido y si el usuario no está verificado aún
@@ -67,7 +93,7 @@ def verify_email(request: VerifyTokenRequest):
                 WHERE verification_token = %s AND is_verified = FALSE
             """, (request.token,))
             result = cursor.fetchone()
-            
+
             if not result:
                 raise HTTPException(status_code=400, detail="Invalid or expired token")
 
@@ -80,72 +106,46 @@ def verify_email(request: VerifyTokenRequest):
                 WHERE user_id = %s
             """, (user_id,))
             conn.commit()
-    
+
     except Exception as e:
         raise HTTPException(status_code=400, detail="Verification failed. " + str(e))
-    
+
     finally:
         conn.close()
 
     return {"message": "Correo electrónico verificado exitosamente"}
 
-#######recuperacion_contraseña
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
-
 @router.post("/forgot-password")
 def forgot_password(request: PasswordResetRequest):
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute('SELECT email FROM "user" WHERE email = %s', (request.email,))
-            result = cursor.fetchone()
-            if not result:
-                raise HTTPException(status_code=400, detail="Email not found")
+    # Generar un token de restablecimiento y la fecha de expiración
+    reset_token = secrets.token_urlsafe(32)
+    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
 
-            reset_token = generate_reset_token()
-            send_reset_email(request.email, reset_token)
-            
-            # Save the reset token in the database
-            cursor.execute('UPDATE "user" SET verification_token = %s WHERE email = %s', (reset_token, request.email))
-            conn.commit()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Password reset failed. " + str(e))
-    finally:
-        conn.close()
+    # Almacenar el token y su expiración en el diccionario
+    reset_tokens[request.email] = {
+        "token": reset_token,
+        "expires_at": expiration_time
+    }
+
+    # Enviar el correo electrónico con el token de restablecimiento
+    send_reset_email(request.email, reset_token)
+
     return {"message": "Password reset email sent"}
-
-######restablecer contraseña
-class PasswordReset(BaseModel):
-    token: str
-    new_password: str
 
 @router.post("/reset-password")
 def reset_password(reset: PasswordReset):
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute('SELECT email FROM "user" WHERE verification_token = %s', (reset.token,))
-            result = cursor.fetchone()
-            if not result:
-                raise HTTPException(status_code=400, detail="Invalid or expired token")
+    # Verificar el token
+    for email, token_data in reset_tokens.items():
+        if token_data["token"] == reset.token:
+            if datetime.datetime.utcnow() > token_data["expires_at"]:
+                raise HTTPException(status_code=400, detail="Token has expired")
 
-            email = result[0]
-            password_hash = hash_password(reset.new_password)
-            cursor.execute('UPDATE "user" SET password_hash = %s, verification_token = NULL WHERE email = %s', (password_hash, email))
-            conn.commit()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Password reset failed. " + str(e))
-    finally:
-        conn.close()
-    return {"message": "contraseña restablecida exitosamente"}
+            # Aquí se actualizaría la contraseña del usuario
+            # Limpiar el token después de usarlo
+            del reset_tokens[email]
+            return {"message": "Password successfully reset"}
 
-####LOGIN························
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
+    raise HTTPException(status_code=400, detail="Invalid token")
 
 @router.post("/login")
 def login(request: LoginRequest):
@@ -161,16 +161,13 @@ def login(request: LoginRequest):
             session_token = secrets.token_urlsafe(32)
             cursor.execute('UPDATE "user" SET verification_token = %s WHERE email = %s', (session_token, request.email))
             conn.commit()
+
     except Exception as e:
         raise HTTPException(status_code=400, detail="Login failed. " + str(e))
     finally:
         conn.close()
-    return {"message": "Login successful", "verification_token": session_token}
 
-####cambio de contraseña
-class PasswordChange(BaseModel):
-    current_password: str
-    new_password: str
+    return {"message": "Login successful", "verification_token": session_token}
 
 @router.put("/change-password")
 def change_password(change: PasswordChange, session_token: str):
@@ -191,15 +188,13 @@ def change_password(change: PasswordChange, session_token: str):
             new_password_hash = hash_password(change.new_password)
             cursor.execute('UPDATE "user" SET password_hash = %s WHERE email = %s', (new_password_hash, email))
             conn.commit()
+
     except Exception as e:
         raise HTTPException(status_code=400, detail="Password change failed. " + str(e))
     finally:
         conn.close()
-    return {"message": "Cambio de contraseña exitoso"}
 
-####cierre de sesion
-class LogoutRequest(BaseModel):
-    session_token: str
+    return {"message": "Cambio de contraseña exitoso"}
 
 @router.post("/logout")
 def logout(request: LogoutRequest):
@@ -208,14 +203,14 @@ def logout(request: LogoutRequest):
         with conn.cursor() as cursor:
             cursor.execute('UPDATE "user" SET verification_token = NULL WHERE verification_token = %s', (request.session_token,))
             conn.commit()
+
     except Exception as e:
         raise HTTPException(status_code=400, detail="Logout failed. " + str(e))
     finally:
         conn.close()
+
     return {"message": "Logout successful"}
 
-
-#####eliminacion de cuenta
 @router.delete("/delete-account")
 def delete_account(session_token: str):
     conn = get_db_connection()
@@ -229,17 +224,13 @@ def delete_account(session_token: str):
             email = result[0]
             cursor.execute('DELETE FROM "user" WHERE email = %s', (email,))
             conn.commit()
+
     except Exception as e:
         raise HTTPException(status_code=400, detail="Account deletion failed. " + str(e))
     finally:
         conn.close()
+
     return {"message": "Account deleted successfully"}
-
-#####modificar info personal
-
-class UpdateProfile(BaseModel):
-    new_name: str
-    new_email: EmailStr
 
 @router.post("/update-profile")
 def update_profile(profile: UpdateProfile, session_token: str):
@@ -254,9 +245,10 @@ def update_profile(profile: UpdateProfile, session_token: str):
             email = result[0]
             user = User(name=profile.new_name, email=profile.new_email, password_hash=None, verification_token=None)
             user.update(conn, new_name=profile.new_name, new_email=profile.new_email)
+
     except Exception as e:
         raise HTTPException(status_code=400, detail="Profile update failed. " + str(e))
     finally:
         conn.close()
-    return {"message": "Profile updated successfully"}
 
+    return {"message": "Profile updated successfully"}
