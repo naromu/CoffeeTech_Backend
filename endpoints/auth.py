@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from models.user import User
 from utils.security import hash_password, generate_verification_token, generate_reset_token, verify_password
-from utils.email import send_verification_email, send_reset_email
+from utils.email import send_email
 from dataBase import get_db_session
 import secrets
 import datetime
@@ -64,9 +64,10 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    email_type = 'verification'
 
-    send_verification_email(user.email, verification_token)
-
+   # send_verification_email(user.email, verification_token)
+    send_email(user.email, verification_token, email_type)
     return {"message": "Hemos enviado un correo electrónico para verificar tu cuenta"}
 
 @router.post("/verify")
@@ -82,7 +83,12 @@ def verify_email(request: VerifyTokenRequest, db: Session = Depends(get_db_sessi
     return {"message": "Correo electrónico verificado exitosamente"}
 
 @router.post("/forgot-password")
-def forgot_password(request: PasswordResetRequest):
+def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_session)):
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    # Genera un token de restablecimiento y establece su tiempo de expiración
     reset_token = secrets.token_urlsafe(32)
     expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
 
@@ -91,9 +97,14 @@ def forgot_password(request: PasswordResetRequest):
         "expires_at": expiration_time
     }
 
-    send_reset_email(request.email, reset_token)
+    # Define el tipo de correo como 'reset'
+    email_type = 'reset'
+
+    # Envía el correo electrónico de restablecimiento
+    send_email(request.email, reset_token, email_type)
 
     return {"message": "Password reset email sent"}
+
 
 @router.post("/reset-password")
 def reset_password(reset: PasswordReset):
