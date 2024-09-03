@@ -8,7 +8,8 @@ from dataBase import get_db_session
 import secrets
 import datetime
 import logging
-
+from pydantic import BaseModel
+from typing import Any, Dict
 
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
@@ -49,20 +50,27 @@ class UpdateProfile(BaseModel):
 
 reset_tokens = {}
 
+# Función auxiliar para crear una respuesta uniforme
+def create_response(status: str, message: str, data: Dict[str, Any] = None):
+    return {
+        "status": status,
+        "message": message,
+        "data": data or {}
+    }
+
+# Endpoint de registro de usuario
 @router.post("/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
+    # Verificación de que las contraseñas coinciden
+    if user.password != user.passwordConfirmation:
+        return create_response("error", "Las contraseñas no coinciden")
+
+    # Comprobar si el usuario ya existe en la base de datos
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if db_user:
+        return create_response("error", "El email está registrado")
+
     try:
-        # Verificación de que las contraseñas coinciden
-        if user.password != user.passwordConfirmation:
-            logger.error("Las contraseñas no coinciden")
-            raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
-
-        # Comprobar si el usuario ya existe en la base de datos
-        db_user = db.query(User).filter(User.email == user.email).first()
-        if db_user:
-            logger.error(f"El email {user.email} ya está registrado")
-            raise HTTPException(status_code=400, detail="El email está registrado")
-
         # Crear un hash de la contraseña y generar un token de verificación
         password_hash = hash_password(user.password)
         verification_token = generate_verification_token()
@@ -83,15 +91,12 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
         # Enviar correo electrónico de verificación
         send_email(user.email, verification_token, 'verification')
 
-        logger.info(f"Usuario {user.email} registrado exitosamente.")
-        return {"message": "Hemos enviado un correo electrónico para verificar tu cuenta"}
+        return create_response("success", "Hemos enviado un correo electrónico para verificar tu cuenta")
 
     except Exception as e:
         # Manejo de errores en caso de que el envío del correo o la transacción falle
         db.rollback()  # Revertir cambios en caso de error
-        logger.error(f"Error al registrar usuario o enviar correo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al registrar usuario o enviar correo: {str(e)}")
-    
     
     
     
