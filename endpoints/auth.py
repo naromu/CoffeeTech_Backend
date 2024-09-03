@@ -45,30 +45,42 @@ reset_tokens = {}
 
 @router.post("/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
+    # Verificación de que las contraseñas coinciden
     if user.password != user.passwordConfirmation:
-        raise HTTPException(status_code=400, detail="Passwords do not match")
+        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
 
+    # Comprobar si el usuario ya existe en la base de datos
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Email is already registered")
+        raise HTTPException(status_code=400, detail="El email está registrado")
 
+    # Crear un hash de la contraseña y generar un token de verificación
     password_hash = hash_password(user.password)
     verification_token = generate_verification_token()
 
+    # Crear un nuevo usuario
     new_user = User(
         name=user.name,
         email=user.email,
         password_hash=password_hash,
         verification_token=verification_token
     )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    email_type = 'verification'
 
-   # send_verification_email(user.email, verification_token)
-    send_email(user.email, verification_token, email_type)
-    return {"message": "Hemos enviado un correo electrónico para verificar tu cuenta"}
+    try:
+        # Añadir y confirmar cambios en la base de datos
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)  # Refrescar para obtener los datos más recientes del objeto
+
+        # Enviar correo electrónico de verificación
+        send_email(user.email, verification_token, 'verification')
+
+        return {"message": "Hemos enviado un correo electrónico para verificar tu cuenta"}
+    except Exception as e:
+        # Manejo de errores en caso de que el envío del correo o la transacción falle
+        db.rollback()  # Revertir cambios en caso de error
+        raise HTTPException(status_code=500, detail=f"Error al registrar usuario o enviar correo: {str(e)}")
+
 
 @router.post("/verify")
 def verify_email(request: VerifyTokenRequest, db: Session = Depends(get_db_session)):
