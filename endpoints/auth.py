@@ -43,33 +43,6 @@ class UpdateProfile(BaseModel):
 
 reset_tokens = {}
 
-@router.post("/register")
-def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
-    if user.password != user.passwordConfirmation:
-        raise HTTPException(status_code=400, detail="Passwords do not match")
-
-    db_user = db.query(User).filter(User.email == user.email).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email is already registered")
-
-    password_hash = hash_password(user.password)
-    verification_token = generate_verification_token()
-
-    new_user = User(
-        name=user.name,
-        email=user.email,
-        password_hash=password_hash,
-        verification_token=verification_token
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    email_type = 'verification'
-
-   # send_verification_email(user.email, verification_token)
-    send_email(user.email, verification_token, email_type)
-    return {"message": "Hemos enviado un correo electrónico para verificar tu cuenta"}
-
 
 @router.post("/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
@@ -80,7 +53,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
     # Comprobar si el usuario ya existe en la base de datos
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="El email está registrado")
+        raise HTTPException(status_code=400, detail="El correo ya está registrado")
 
     # Crear un hash de la contraseña y generar un token de verificación
     password_hash = hash_password(user.password)
@@ -113,7 +86,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
 def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_session)):
     user = db.query(User).filter(User.email == request.email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Email not found")
+        raise HTTPException(status_code=404, detail="Correo no encontrado")
 
     # Genera un token de restablecimiento y establece su tiempo de expiración
     reset_token = secrets.token_urlsafe(32)
