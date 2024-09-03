@@ -7,6 +7,12 @@ from utils.email import send_email
 from dataBase import get_db_session
 import secrets
 import datetime
+import logging
+
+
+# Configuración básica de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -45,28 +51,30 @@ reset_tokens = {}
 
 @router.post("/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
-    # Verificación de que las contraseñas coinciden
-    if user.password != user.passwordConfirmation:
-        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
-
-    # Comprobar si el usuario ya existe en la base de datos
-    db_user = db.query(User).filter(User.email == user.email).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="El email está registrado")
-
-    # Crear un hash de la contraseña y generar un token de verificación
-    password_hash = hash_password(user.password)
-    verification_token = generate_verification_token()
-
-    # Crear un nuevo usuario
-    new_user = User(
-        name=user.name,
-        email=user.email,
-        password_hash=password_hash,
-        verification_token=verification_token
-    )
-
     try:
+        # Verificación de que las contraseñas coinciden
+        if user.password != user.passwordConfirmation:
+            logger.error("Las contraseñas no coinciden")
+            raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
+
+        # Comprobar si el usuario ya existe en la base de datos
+        db_user = db.query(User).filter(User.email == user.email).first()
+        if db_user:
+            logger.error(f"El email {user.email} ya está registrado")
+            raise HTTPException(status_code=400, detail="El email está registrado")
+
+        # Crear un hash de la contraseña y generar un token de verificación
+        password_hash = hash_password(user.password)
+        verification_token = generate_verification_token()
+
+        # Crear un nuevo usuario
+        new_user = User(
+            name=user.name,
+            email=user.email,
+            password_hash=password_hash,
+            verification_token=verification_token
+        )
+
         # Añadir y confirmar cambios en la base de datos
         db.add(new_user)
         db.commit()
@@ -75,12 +83,18 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
         # Enviar correo electrónico de verificación
         send_email(user.email, verification_token, 'verification')
 
+        logger.info(f"Usuario {user.email} registrado exitosamente.")
         return {"message": "Hemos enviado un correo electrónico para verificar tu cuenta"}
+
     except Exception as e:
         # Manejo de errores en caso de que el envío del correo o la transacción falle
         db.rollback()  # Revertir cambios en caso de error
+        logger.error(f"Error al registrar usuario o enviar correo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al registrar usuario o enviar correo: {str(e)}")
-
+    
+    
+    
+    
 
 @router.post("/verify")
 def verify_email(request: VerifyTokenRequest, db: Session = Depends(get_db_session)):
