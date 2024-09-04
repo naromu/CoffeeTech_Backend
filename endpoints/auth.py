@@ -131,12 +131,17 @@ def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_
         reset_token = secrets.token_urlsafe(32)
         expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
 
+        user.verification_token = reset_token
+        db.commit()
         reset_tokens[request.email] = {
             "token": reset_token,
             "expires_at": expiration_time
         }
 
         send_email(request.email, reset_token, 'reset')
+        
+        
+        
         return create_response("success", "Correo electrónico de restablecimiento de contraseña enviado")
     except Exception as e:
         db.rollback()
@@ -146,10 +151,19 @@ def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_
 @router.post("/verify-token")
 def verify_token(request: VerifyTokenRequest, db: Session = Depends(get_db_session)):
     user = verify_user_token(request.token, db)
+    
     if not user:
-        return create_response("error", "Token invalido o expirado")
+        return create_response("error", "Token inválido o expirado")
 
-    return create_response("success", "Token válido. Puede proceder a restablecer la contraseña.")
+    try:
+        # Una vez verificado, vacía el campo `verification_token`
+        user.verification_token = None
+        db.commit()
+
+        return create_response("success", "Token válido. Puede proceder a restablecer la contraseña.")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error verifying token: {str(e)}")
 
 # Restablecer contraseña
 @router.post("/reset-password")
