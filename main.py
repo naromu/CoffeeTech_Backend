@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from endpoints import auth
+from endpoints import farm
 from dataBase import engine
 from models.user import Base
 
@@ -10,6 +11,7 @@ app = FastAPI()
 
 # Incluir las rutas de auth
 app.include_router(auth.router)
+app.include_router(farm.router)
 
 @app.get("/")
 def read_root():
