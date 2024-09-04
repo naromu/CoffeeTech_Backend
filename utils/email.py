@@ -196,6 +196,3 @@ def send_email(email, token, email_type):
     except Exception as e:
         print(f"Error al enviar correo de {email_type}: {e}")
 
-# Ejemplo de uso
-send_email('destinatario@example.com', 'tu_token', 'verification')
-send_email('destinatario@example.com', 'tu_token', 'reset')
