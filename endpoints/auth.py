@@ -59,10 +59,11 @@ def create_response(status: str, message: str, data: Dict[str, Any] = None):
 
 # Función auxiliar para verificar tokens
 def verify_user_token(token: str, db: Session) -> User:
-    user = db.query(User).filter(User.reset_token == token).first()
+    user = db.query(User).filter(User.verification_token == token).first()
     if not user or (user.token_expiration and user.token_expiration < datetime.datetime.utcnow()):
         return None
     return user
+
 
 # Función auxiliar para verificar tokens de sesión
 def verify_session_token(session_token: str, db: Session) -> User:
