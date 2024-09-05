@@ -69,7 +69,7 @@ def verify_user_token(token: str, db: Session) -> User:
 
 # Función auxiliar para verificar tokens de sesión
 def verify_session_token(session_token: str, db: Session) -> User:
-    user = db.query(User).filter(User.verification_token == session_token, User.is_verified == True).first()
+    user = db.query(User).filter(User.verification_token == session_token).first()
     if not user:
         return None
     return user
@@ -122,8 +122,12 @@ def verify_email(request: VerifyTokenRequest, db: Session = Depends(get_db_sessi
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error verifying email: {str(e)}")
 
+# Declaración global del diccionario
+reset_tokens = {}
 @router.post("/forgot-password")
 def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_session)):
+    global reset_tokens  # Aseguramos que estamos usando la variable global
+
     logger.info("Iniciando el proceso de restablecimiento de contraseña para el correo: %s", request.email)
     
     user = db.query(User).filter(User.email == request.email).first()
@@ -141,85 +145,120 @@ def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_
         expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
         logger.info("Tiempo de expiración del token establecido para: %s", expiration_time)
 
-        # Almacena el token y el tiempo de expiración en el diccionario en memoria
-        reset_tokens[request.email] = {
-            "token": reset_token,
-            "expires_at": expiration_time
+        # Almacenar el token en la base de datos
+        user.verification_token = reset_token
+        logger.info("Token de restablecimiento guardado en la base de datos para el usuario: %s", user.email)
+
+        # Guardar el token y el tiempo de expiración en el diccionario global, sobrescribiendo el token existente si lo hay
+        reset_tokens[reset_token] = {
+            "expires_at": expiration_time,
+            "email": request.email  # Asociamos el token con el correo
         }
-        logger.info("Token de restablecimiento almacenado en el diccionario para el correo: %s", request.email)
+        logger.info("Token de restablecimiento almacenado globalmente para el correo: %s", request.email)
+
+        print (reset_token)
+        # Guardar cambios en la base de datos
+        db.commit()
+        logger.info("Cambios guardados en la base de datos para el usuario: %s", user.email)
 
         # Envía un correo electrónico con el token de restablecimiento
         send_email(request.email, reset_token, 'reset')
         logger.info("Correo electrónico de restablecimiento enviado a: %s", request.email)
 
         return create_response("success", "Correo electrónico de restablecimiento de contraseña enviado")
+
     except Exception as e:
-        logger.error("Error durante el envío del correo de restablecimiento: %s", str(e))
+        logger.error("Error durante el proceso de restablecimiento de contraseña: %s", str(e))
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error sending password reset email: {str(e)}")
 
 
 @router.post("/verify-token")
 def verify_token(request: VerifyTokenRequest, db: Session = Depends(get_db_session)):
-    # Buscar el token en el diccionario en memoria
-    for email, token_info in reset_tokens.items():
-        if token_info['token'] == request.token:
-            # Verificar si el token ha expirado
-            if datetime.utcnow() > token_info['expires_at']:
-                return create_response("error", "Token ha expirado")
+    global reset_tokens
 
-            # Token válido, no eliminamos el token, solo confirmamos la validez
-            return create_response("success", "Token válido. Puede proceder a restablecer la contraseña.")
+    logger.info("Iniciando la verificación del token: %s", request.token)
+    logger.debug("Estado actual de reset_tokens: %s", reset_tokens)
 
+    token_info = reset_tokens.get(request.token)
+
+    if token_info:
+        logger.info("Token encontrado: %s", request.token)
+
+        current_time = datetime.datetime.utcnow()
+        expires_at = token_info['expires_at']
+        logger.debug("Hora actual: %s, Expira a: %s", current_time, expires_at)
+
+        if current_time > expires_at:
+            logger.info("El token ha expirado: %s", request.token)
+            return create_response("error", "Token ha expirado")
+
+        logger.info("Token válido, puede proceder a restablecer la contraseña.")
+        return create_response("success", "Token válido. Puede proceder a restablecer la contraseña.")
+
+    logger.warning("Token inválido o expirado: %s", request.token)
     return create_response("error", "Token inválido o expirado")
-
-from fastapi import HTTPException
-
-class PasswordReset(BaseModel):
-    token: str
-    new_password: str
-    confirm_password: str  # Agregamos la confirmación de contraseña
 
 @router.post("/reset-password")
 def reset_password(reset: PasswordReset, db: Session = Depends(get_db_session)):
+    global reset_tokens  # Aseguramos que estamos usando la variable global
+
+    logger.info("Iniciando el proceso de restablecimiento de contraseña para el token: %s", reset.token)
+
     # Verificar que las contraseñas coincidan
     if reset.new_password != reset.confirm_password:
+        logger.warning("Las contraseñas no coinciden para el token: %s", reset.token)
         return create_response("error", "Las contraseñas no coinciden")
 
     # Verificar el token en el diccionario en memoria
-    email_to_reset = None
-    for email, token_info in reset_tokens.items():
-        if token_info['token'] == reset.token:
-            # Verificar si el token ha expirado
-            if datetime.utcnow() > token_info['expires_at']:
-                return create_response("error", "Token ha expirado")
-            email_to_reset = email
-            break
+    token_info = reset_tokens.get(reset.token)
 
-    if not email_to_reset:
+    if token_info:
+        logger.info("Token encontrado en memoria: %s", reset.token)
+
+        # Verificar si el token ha expirado
+        current_time = datetime.datetime.utcnow()
+        expires_at = token_info['expires_at']
+        logger.debug("Hora actual: %s, Expira a: %s", current_time, expires_at)
+
+        if current_time > expires_at:
+            logger.info("El token ha expirado: %s", reset.token)
+            del reset_tokens[reset.token]  # Eliminar token expirado
+            return create_response("error", "Token ha expirado")
+
+        # Obtener el usuario de la base de datos usando el token
+        user = db.query(User).filter(User.verification_token == reset.token).first()
+        if not user:
+            logger.warning("Usuario no encontrado para el token: %s", reset.token)
+            return create_response("error", "Usuario no encontrado")
+
+        try:
+            # Actualizar la contraseña del usuario
+            new_password_hash = hash_password(reset.new_password)
+            logger.debug("Hash de la nueva contraseña generado: %s", new_password_hash)
+
+            user.password_hash = new_password_hash
+            logger.info("Contraseña actualizada para el usuario: %s", user.email)
+
+            # Limpiar el token después de usarlo
+            user.verification_token = None
+
+            # Confirmar los cambios en la base de datos
+            db.commit()
+            logger.info("Cambios confirmados en la base de datos para el usuario: %s", user.email)
+
+            # Eliminar el token del diccionario después de usarlo
+            del reset_tokens[reset.token]
+            logger.info("Token eliminado del diccionario global: %s", reset.token)
+
+            return create_response("success", "Contraseña restablecida exitosamente")
+        except Exception as e:
+            logger.error("Error al restablecer la contraseña: %s", str(e))
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Error resetting password: {str(e)}")
+    else:
+        logger.warning("Token inválido o expirado: %s", reset.token)
         return create_response("error", "Token inválido o expirado")
-
-    # Obtener el usuario de la base de datos
-    user = db.query(User).filter(User.email == email_to_reset).first()
-    if not user:
-        return create_response("error", "Usuario no encontrado")
-
-    try:
-        # Actualizar la contraseña del usuario
-        new_password_hash = hash_password(reset.new_password)
-        user.password_hash = new_password_hash
-
-        # Limpiar el token después de usarlo
-        user.verification_token = None
-        db.commit()
-
-        # Eliminar el token del diccionario después de usarlo
-        del reset_tokens[email_to_reset]
-
-        return create_response("success", "Contraseña restablecida exitosamente")
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error resetting password: {str(e)}")
 
 
 # Inicio de sesión
