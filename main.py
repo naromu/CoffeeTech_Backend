@@ -9,9 +9,11 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Incluir las rutas de auth
-app.include_router(auth.router)
-app.include_router(farm.router)
+# Incluir las rutas de auth con prefijo y etiqueta
+app.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
+
+# Incluir las rutas de farm con prefijo y etiqueta
+app.include_router(farm.router, prefix="/farms", tags=["Gestión de Fincas"])
 
 @app.get("/")
 def read_root():
