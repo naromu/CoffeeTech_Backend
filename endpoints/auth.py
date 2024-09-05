@@ -122,31 +122,39 @@ def verify_email(request: VerifyTokenRequest, db: Session = Depends(get_db_sessi
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error verifying email: {str(e)}")
 
-
 @router.post("/forgot-password")
 def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_session)):
+    logger.info("Iniciando el proceso de restablecimiento de contraseña para el correo: %s", request.email)
+    
     user = db.query(User).filter(User.email == request.email).first()
     
     if not user:
+        logger.warning("Correo no encontrado: %s", request.email)
         return create_response("error", "Correo no encontrado")
 
     try:
         # Genera un token único para restablecer la contraseña
         reset_token = secrets.token_urlsafe(32)
+        logger.info("Token de restablecimiento generado: %s", reset_token)
+
         # Configura el tiempo de expiración para 15 minutos en el futuro
-        expiration_time = datetime.utcnow() + timedelta(minutes=15)
+        expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+        logger.info("Tiempo de expiración del token establecido para: %s", expiration_time)
 
         # Almacena el token y el tiempo de expiración en el diccionario en memoria
         reset_tokens[request.email] = {
             "token": reset_token,
             "expires_at": expiration_time
         }
+        logger.info("Token de restablecimiento almacenado en el diccionario para el correo: %s", request.email)
 
         # Envía un correo electrónico con el token de restablecimiento
         send_email(request.email, reset_token, 'reset')
+        logger.info("Correo electrónico de restablecimiento enviado a: %s", request.email)
 
         return create_response("success", "Correo electrónico de restablecimiento de contraseña enviado")
     except Exception as e:
+        logger.error("Error durante el envío del correo de restablecimiento: %s", str(e))
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error sending password reset email: {str(e)}")
 
