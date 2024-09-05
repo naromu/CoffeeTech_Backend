@@ -28,9 +28,11 @@ class VerifyTokenRequest(BaseModel):
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 
+
 class PasswordReset(BaseModel):
     token: str
     new_password: str
+    confirm_password: str  
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -120,69 +122,97 @@ def verify_email(request: VerifyTokenRequest, db: Session = Depends(get_db_sessi
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error verifying email: {str(e)}")
 
-# Olvidó su contraseña
+
 @router.post("/forgot-password")
 def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_session)):
     user = db.query(User).filter(User.email == request.email).first()
+    
     if not user:
         return create_response("error", "Correo no encontrado")
 
     try:
+        # Genera un token único para restablecer la contraseña
         reset_token = secrets.token_urlsafe(32)
-        expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+        # Configura el tiempo de expiración para 15 minutos en el futuro
+        expiration_time = datetime.utcnow() + timedelta(minutes=15)
 
-        user.verification_token = reset_token
-        db.commit()
+        # Almacena el token y el tiempo de expiración en el diccionario en memoria
         reset_tokens[request.email] = {
             "token": reset_token,
             "expires_at": expiration_time
         }
 
+        # Envía un correo electrónico con el token de restablecimiento
         send_email(request.email, reset_token, 'reset')
-        
-        
-        
+
         return create_response("success", "Correo electrónico de restablecimiento de contraseña enviado")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error sending password reset email: {str(e)}")
 
-# Verificar el token de restablecimiento de contraseña
+
 @router.post("/verify-token")
 def verify_token(request: VerifyTokenRequest, db: Session = Depends(get_db_session)):
-    user = verify_user_token(request.token, db)
-    
-    if not user:
+    # Buscar el token en el diccionario en memoria
+    for email, token_info in reset_tokens.items():
+        if token_info['token'] == request.token:
+            # Verificar si el token ha expirado
+            if datetime.utcnow() > token_info['expires_at']:
+                return create_response("error", "Token ha expirado")
+
+            # Token válido, no eliminamos el token, solo confirmamos la validez
+            return create_response("success", "Token válido. Puede proceder a restablecer la contraseña.")
+
+    return create_response("error", "Token inválido o expirado")
+
+from fastapi import HTTPException
+
+class PasswordReset(BaseModel):
+    token: str
+    new_password: str
+    confirm_password: str  # Agregamos la confirmación de contraseña
+
+@router.post("/reset-password")
+def reset_password(reset: PasswordReset, db: Session = Depends(get_db_session)):
+    # Verificar que las contraseñas coincidan
+    if reset.new_password != reset.confirm_password:
+        return create_response("error", "Las contraseñas no coinciden")
+
+    # Verificar el token en el diccionario en memoria
+    email_to_reset = None
+    for email, token_info in reset_tokens.items():
+        if token_info['token'] == reset.token:
+            # Verificar si el token ha expirado
+            if datetime.utcnow() > token_info['expires_at']:
+                return create_response("error", "Token ha expirado")
+            email_to_reset = email
+            break
+
+    if not email_to_reset:
         return create_response("error", "Token inválido o expirado")
 
+    # Obtener el usuario de la base de datos
+    user = db.query(User).filter(User.email == email_to_reset).first()
+    if not user:
+        return create_response("error", "Usuario no encontrado")
+
     try:
-        # Una vez verificado, vacía el campo `verification_token`
+        # Actualizar la contraseña del usuario
+        new_password_hash = hash_password(reset.new_password)
+        user.password_hash = new_password_hash
+
+        # Limpiar el token después de usarlo
         user.verification_token = None
         db.commit()
 
-        return create_response("success", "Token válido. Puede proceder a restablecer la contraseña.")
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error verifying token: {str(e)}")
+        # Eliminar el token del diccionario después de usarlo
+        del reset_tokens[email_to_reset]
 
-# Restablecer contraseña
-@router.post("/reset-password")
-def reset_password(reset: PasswordReset, db: Session = Depends(get_db_session)):
-    user = verify_user_token(reset.token, db)
-    if not user:
-        return create_response("error", "Token invalido o expirado")
-
-    try:
-        new_password_hash = hash_password(reset.new_password)
-        user.password_hash = new_password_hash
-        user.reset_token = None
-        user.token_expiration = None
-
-        db.commit()
         return create_response("success", "Contraseña restablecida exitosamente")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error resetting password: {str(e)}")
+
 
 # Inicio de sesión
 @router.post("/login")
