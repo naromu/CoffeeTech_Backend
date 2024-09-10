@@ -12,5 +12,6 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     verification_token = Column(String, unique=True)
     is_verified = Column(Boolean, default=False)
+    session_token = Column(String, unique=True)
 
     # Métodos adicionales (como save, update, delete) no son necesarios con SQLAlchemy.

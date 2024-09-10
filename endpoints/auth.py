@@ -69,7 +69,7 @@ def verify_user_token(token: str, db: Session) -> User:
 
 # Función auxiliar para verificar tokens de sesión
 def verify_session_token(session_token: str, db: Session) -> User:
-    user = db.query(User).filter(User.verification_token == session_token).first()
+    user = db.query(User).filter(User.session_token == session_token).first()
     if not user:
         return None
     return user
@@ -265,14 +265,18 @@ def reset_password(reset: PasswordReset, db: Session = Depends(get_db_session)):
 @router.post("/login")
 def login(request: LoginRequest, db: Session = Depends(get_db_session)):
     user = db.query(User).filter(User.email == request.email).first()
+    
+    if not user.is_verified:
+        return create_response("error", "Debes verificar tu correo antes de iniciar sesión")
+    
     if not user or not verify_password(request.password, user.password_hash):
         return create_response("error", "Credenciales incorrectas")
-
+    
     try:
         session_token = secrets.token_urlsafe(32)
-        user.verification_token = session_token
+        user.session_token = session_token
         db.commit()
-        return create_response("success", "Inicio de sesión exitoso", {"verification_token": session_token})
+        return create_response("success", "Inicio de sesión exitoso", {"session_token": session_token})
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error during login: {str(e)}")
@@ -301,7 +305,7 @@ def logout(request: LogoutRequest, db: Session = Depends(get_db_session)):
         return create_response("error", "Token de sesion invalido")
 
     try:
-        user.verification_token = None
+        user.session_token = None
         db.commit()
         return create_response("success", "Cierre de sesión exitoso")
     except Exception as e:
