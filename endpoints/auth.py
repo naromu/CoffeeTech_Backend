@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from models.user import User
-from utils.security import hash_password, generate_verification_token, generate_reset_token, verify_password
+from utils.security import hash_password, generate_verification_token , verify_password
 from utils.email import send_email
 from dataBase import get_db_session
 import secrets
@@ -86,7 +86,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
 
     try:
         password_hash = hash_password(user.password)
-        verification_token = generate_verification_token()
+        verification_token = generate_verification_token(8)
 
         new_user = User(
             name=user.name,
@@ -138,7 +138,7 @@ def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_
 
     try:
         # Genera un token único para restablecer la contraseña
-        reset_token = secrets.token_urlsafe(32)
+        reset_token = generate_verification_token(8)
         logger.info("Token de restablecimiento generado: %s", reset_token)
 
         # Configura el tiempo de expiración para 15 minutos en el futuro
@@ -266,14 +266,15 @@ def reset_password(reset: PasswordReset, db: Session = Depends(get_db_session)):
 def login(request: LoginRequest, db: Session = Depends(get_db_session)):
     user = db.query(User).filter(User.email == request.email).first()
     
-    if not user.is_verified:
-        return create_response("error", "Debes verificar tu correo antes de iniciar sesión")
-    
     if not user or not verify_password(request.password, user.password_hash):
         return create_response("error", "Credenciales incorrectas")
     
+    if not user or not user.is_verified:
+        return create_response("error", "Debes verificar tu correo antes de iniciar sesión")
+    
+    
     try:
-        session_token = secrets.token_urlsafe(32)
+        session_token = generate_verification_token(32)
         user.session_token = session_token
         db.commit()
         return create_response("success", "Inicio de sesión exitoso", {"session_token": session_token})

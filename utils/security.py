@@ -20,11 +20,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 
-def generate_verification_token() -> str:
-    return secrets.token_urlsafe(16)
+def generate_verification_token(long) -> str:
+    return secrets.token_urlsafe(long)
 
-def generate_reset_token() -> str:
-    return secrets.token_urlsafe(32)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
