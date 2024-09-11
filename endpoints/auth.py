@@ -47,7 +47,7 @@ class LogoutRequest(BaseModel):
 
 class UpdateProfile(BaseModel):
     new_name: str
-    new_email: EmailStr
+   
 
 reset_tokens = {}
 
@@ -277,7 +277,7 @@ def login(request: LoginRequest, db: Session = Depends(get_db_session)):
         session_token = generate_verification_token(32)
         user.session_token = session_token
         db.commit()
-        return create_response("success", "Inicio de sesión exitoso", {"session_token": session_token})
+        return create_response("success", "Inicio de sesión exitoso", {"session_token": session_token, "name": user.name})
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error during login: {str(e)}")
@@ -336,8 +336,8 @@ def update_profile(profile: UpdateProfile, session_token: str, db: Session = Dep
         return create_response("error", "Token de sesion invalido")
 
     try:
+        # Solo actualizamos el nombre del usuario
         user.name = profile.new_name
-        user.email = profile.new_email
         db.commit()
         return create_response("success", "Perfil actualizado exitosamente")
     except Exception as e:
