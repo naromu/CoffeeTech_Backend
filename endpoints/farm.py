@@ -5,7 +5,9 @@ from models.models import Farm, UserRoleFarm, User, UnitOfMeasure, Role, Status,
 from utils.security import verify_session_token
 from dataBase import get_db_session
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List
+
+
 
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
@@ -14,6 +16,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class CreateFarmRequest(BaseModel):
+    name: str
+    area: float
+    unitMeasure: str
+    
+class ListFarmResponse(BaseModel):
+    farm_id: int
+    name: str
+    area: float
+    unit_of_measure: str
+    status: str
+    
+class UpdateFarmRequest(BaseModel):
+    farm_id: int
     name: str
     area: float
     unitMeasure: str
@@ -125,3 +140,96 @@ def create_farm(request: CreateFarmRequest, session_token: str, db: Session = De
         db.rollback()
         logger.error("Error al crear la finca o asignar el usuario: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Error al crear la finca o asignar el usuario: {str(e)}")
+
+@router.post("/list-farm")
+def list_farm(session_token: str, db: Session = Depends(get_db_session)):
+    # Verificar el token de sesión
+    user = verify_session_token(session_token, db)
+    if not user:
+        logger.warning("Token de sesión inválido o usuario no encontrado")
+        return create_response("error", "Token de sesión inválido o usuario no encontrado")
+
+    try:
+        # Consultar todas las fincas del usuario
+        farms = db.query(Farm, UnitOfMeasure, Status).join(UserRoleFarm).join(UnitOfMeasure).join(Status).filter(
+            UserRoleFarm.user_id == user.user_id
+        ).all()
+
+        farm_list = []
+        for farm, unit_of_measure, status in farms:
+            farm_list.append(ListFarmResponse(
+                farm_id=farm.farm_id,
+                name=farm.name,
+                area=farm.area,
+                unit_of_measure=unit_of_measure.name,
+                status=status.name
+            ))
+
+        return create_response("success", "Lista de fincas obtenida exitosamente", {"farms": farm_list})
+
+    except Exception as e:
+        logger.error("Error al obtener la lista de fincas: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"Error al obtener la lista de fincas: {str(e)}")
+    
+    
+
+@router.post("/update-farm")
+def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = Depends(get_db_session)):
+    # Verificar el token de sesión
+    user = verify_session_token(session_token, db)
+    if not user:
+        logger.warning("Token de sesión inválido o usuario no encontrado")
+        return create_response("error", "Token de sesión inválido o usuario no encontrado")
+
+    # Validación de existencia de la finca
+    farm = db.query(Farm).join(UserRoleFarm).filter(
+        Farm.farm_id == request.farm_id,
+        UserRoleFarm.user_id == user.user_id
+    ).first()
+
+    if not farm:
+        logger.warning("Finca no encontrada o no pertenece al usuario")
+        return create_response("error", "Finca no encontrada o no pertenece al usuario")
+
+    # Validación 1: El nombre de la finca no puede estar vacío ni contener solo espacios
+    if not request.name or not request.name.strip():
+        logger.warning("El nombre de la finca no puede estar vacío o solo contener espacios")
+        return create_response("error", "El nombre de la finca no puede estar vacío")
+
+    # Validación 2: El nombre no puede exceder los 100 caracteres
+    if len(request.name) > 100:
+        logger.warning("El nombre de la finca es demasiado largo")
+        return create_response("error", "El nombre de la finca no puede tener más de 100 caracteres")
+
+    # Validación 3: El área no puede ser negativa ni cero
+    if request.area <= 0:
+        logger.warning("El área de la finca debe ser mayor que cero")
+        return create_response("error", "El área de la finca debe ser un número positivo mayor que cero")
+
+    # Buscar la unidad de medida (unitMeasure)
+    unit_of_measure = db.query(UnitOfMeasure).filter(UnitOfMeasure.name == request.unitMeasure).first()
+    if not unit_of_measure:
+        logger.warning("Unidad de medida no válida: %s", request.unitMeasure)
+        return create_response("error", "Unidad de medida no válida")
+
+    try:
+        # Actualizar la finca
+        farm.name = request.name
+        farm.area = request.area
+        farm.area_unit_id = unit_of_measure.unit_of_measure_id
+
+        db.commit()
+        db.refresh(farm)
+        logger.info("Finca actualizada exitosamente con ID: %s", farm.farm_id)
+
+        return create_response("success", "Finca actualizada correctamente", {
+            "farm_id": farm.farm_id,
+            "name": farm.name,
+            "area": farm.area,
+            "unit_of_measure": request.unitMeasure
+        })
+    except Exception as e:
+        db.rollback()
+        logger.error("Error al actualizar la finca: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"Error al actualizar la finca: {str(e)}")
+    
