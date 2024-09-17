@@ -26,6 +26,7 @@ class ListFarmResponse(BaseModel):
     area: float
     unit_of_measure: str
     status: str
+    role: str
     
 class UpdateFarmRequest(BaseModel):
     farm_id: int
@@ -141,6 +142,7 @@ def create_farm(request: CreateFarmRequest, session_token: str, db: Session = De
         logger.error("Error al crear la finca o asignar el usuario: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Error al crear la finca o asignar el usuario: {str(e)}")
 
+
 @router.post("/list-farm")
 def list_farm(session_token: str, db: Session = Depends(get_db_session)):
     # Verificar el token de sesión
@@ -150,19 +152,28 @@ def list_farm(session_token: str, db: Session = Depends(get_db_session)):
         return create_response("error", "Token de sesión inválido o usuario no encontrado")
 
     try:
-        # Consultar todas las fincas del usuario
-        farms = db.query(Farm, UnitOfMeasure, Status).join(UserRoleFarm).join(UnitOfMeasure).join(Status).filter(
+        # Hacer la consulta explícita usando select_from y definir bien los joins
+        farms = db.query(Farm, UnitOfMeasure, Status, Role).select_from(UserRoleFarm).join(
+            Farm, UserRoleFarm.farm_id == Farm.farm_id
+        ).join(
+            UnitOfMeasure, Farm.area_unit_id == UnitOfMeasure.unit_of_measure_id
+        ).join(
+            Status, Farm.status_id == Status.status_id
+        ).join(
+            Role, UserRoleFarm.role_id == Role.role_id
+        ).filter(
             UserRoleFarm.user_id == user.user_id
         ).all()
 
         farm_list = []
-        for farm, unit_of_measure, status in farms:
+        for farm, unit_of_measure, status, role in farms:
             farm_list.append(ListFarmResponse(
                 farm_id=farm.farm_id,
                 name=farm.name,
                 area=farm.area,
                 unit_of_measure=unit_of_measure.name,
-                status=status.name
+                status=status.name,
+                role=role.name  # Incluir el rol en la respuesta
             ))
 
         return create_response("success", "Lista de fincas obtenida exitosamente", {"farms": farm_list})
@@ -170,6 +181,8 @@ def list_farm(session_token: str, db: Session = Depends(get_db_session)):
     except Exception as e:
         logger.error("Error al obtener la lista de fincas: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Error al obtener la lista de fincas: {str(e)}")
+
+
     
     
 
