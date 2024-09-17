@@ -2,7 +2,40 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import relationship, declarative_base
 
+
+
+
 Base = declarative_base()
+
+# Modelo para Role
+class Role(Base):
+    __tablename__ = 'role'
+
+    role_id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False, unique=True)
+
+# Modelo para UnitOfMeasureType
+class UnitOfMeasureType(Base):
+    __tablename__ = 'unit_of_measure_type'
+
+    unit_of_measure_type_id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False)
+
+    # Relación con UnitOfMeasure
+    units_of_measure = relationship("UnitOfMeasure", back_populates="unit_of_measure_type")
+
+# Modelo para UnitOfMeasure
+class UnitOfMeasure(Base):
+    __tablename__ = 'unit_of_measure'
+
+    unit_of_measure_id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False)
+    abbreviation = Column(String(10), nullable=False)
+    unit_of_measure_type_id = Column(Integer, ForeignKey('unit_of_measure_type.unit_of_measure_type_id'), nullable=False)
+
+    # Relación con UnitOfMeasureType
+    unit_of_measure_type = relationship("UnitOfMeasureType", back_populates="units_of_measure")
+
 
 # Definición del modelo StatusType
 class StatusType(Base):
