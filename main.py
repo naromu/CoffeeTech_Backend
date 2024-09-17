@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from endpoints import auth
-from endpoints.utils import router as utils_router
-
+from endpoints import utils
+from endpoints import farm 
 from dataBase import engine
 from models.models import Base
 
@@ -14,7 +14,10 @@ app = FastAPI()
 app.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
 
 # Incluir las rutas de utilidades (roles y unidades de medida)
-app.include_router(utils_router, prefix="/utils", tags=["Utilidades"])
+app.include_router(utils.router, prefix="/utils", tags=["Utilidades"])
+
+app.include_router(farm.router, prefix="/farm", tags=["Fincas"])
+
 
 # Incluir las rutas de farm con prefijo y etiqueta
 

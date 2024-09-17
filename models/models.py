@@ -1,11 +1,39 @@
-# models.py
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
-from sqlalchemy.orm import relationship, declarative_base
 
 
-
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey
+from sqlalchemy.orm import relationship
+from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
+
+# Modelo para Farm (Finca)
+class Farm(Base):
+    __tablename__ = 'farm'
+
+    farm_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    area = Column(Numeric(10, 2), nullable=False)
+    area_unit_id = Column(Integer, ForeignKey('unit_of_measure.unit_of_measure_id'), nullable=False)
+    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False)
+
+    # Relaciones
+    area_unit = relationship("UnitOfMeasure")
+    status = relationship("Status")
+
+# Modelo para UserRoleFarm (relación entre usuarios, roles y fincas)
+class UserRoleFarm(Base):
+    __tablename__ = 'user_role_farm'
+
+    user_role_farm_id = Column(Integer, primary_key=True)
+    role_id = Column(Integer, ForeignKey('role.role_id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)
+
+    # Relaciones
+    role = relationship("Role")
+    user = relationship("User")
+    farm = relationship("Farm")
+
 
 # Modelo para Role
 class Role(Base):

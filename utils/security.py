@@ -31,3 +31,10 @@ def get_current_user(db: Session = Depends(get_db_session), token: str = Depends
     if not user or not user.is_verified:
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     return user
+
+# Función auxiliar para verificar tokens de sesión
+def verify_session_token(session_token: str, db: Session) -> User:
+    user = db.query(User).filter(User.session_token == session_token).first()
+    if not user:
+        return None
+    return user

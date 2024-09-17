@@ -3,14 +3,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
-
-#carga
-
-# Cargar variables de entorno desde el archivo .env
-load_dotenv()
-
 from sqlalchemy.ext.declarative import declarative_base
 
+# Función para recargar .env
+def reload_env():
+    load_dotenv(override=True)
+
+# Cargar variables de entorno
+reload_env()
+
+# Definir la base para los modelos de SQLAlchemy
 Base = declarative_base()
 
 
