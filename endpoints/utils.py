@@ -1,14 +1,12 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from models.models import Role
-from models.models import UnitOfMeasure
-
+from models.models import Role, UnitOfMeasure
 from dataBase import get_db_session
 
 router = APIRouter()
 
-@router.post("/list-roles")
-def list_roles(db: Session = Depends(get_db_session)):  # Cambiar get_db por get_db_session
+@router.get("/list-roles")
+def list_roles(db: Session = Depends(get_db_session)):
     roles = db.query(Role).all()
     return {
         "status": "success",
@@ -16,8 +14,8 @@ def list_roles(db: Session = Depends(get_db_session)):  # Cambiar get_db por get
         "data": [{"role_id": role.role_id, "name": role.name} for role in roles]
     }
 
-@router.post("/unit-measure")
-def list_unit_measures(db: Session = Depends(get_db_session)):  # Cambiar get_db por get_db_session
+@router.get("/unit-measure")
+def list_unit_measures(db: Session = Depends(get_db_session)):
     units_of_measure = db.query(UnitOfMeasure).all()
     return {
         "status": "success",
