@@ -2,7 +2,7 @@ from passlib.context import CryptContext
 import secrets
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
-from models.user import User
+from models.models import User
 from dataBase import get_db_session
 from fastapi.security import OAuth2PasswordBearer
 

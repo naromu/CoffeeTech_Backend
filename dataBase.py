@@ -9,6 +9,11 @@ from sqlalchemy import create_engine, text
 # Cargar variables de entorno desde el archivo .env
 load_dotenv()
 
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+
 DB_HOST = os.getenv("PGHOST")
 DB_PORT = os.getenv("PGPORT")
 DB_NAME = os.getenv("PGDATABASE")
@@ -17,6 +22,7 @@ DB_PASSWORD = os.getenv("PGPASSWORD")
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+print (SQLALCHEMY_DATABASE_URL)
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
 try:

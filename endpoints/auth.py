@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
-from models.user import User
+from models.models import User, Status, StatusType  # Importar todos los modelos desde models.py
+
+
 from utils.security import hash_password, generate_verification_token , verify_password
 from utils.email import send_email
 from dataBase import get_db_session
@@ -15,12 +17,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
     passwordConfirmation: str
+    
+
 
 class VerifyTokenRequest(BaseModel):
     token: str
@@ -74,12 +77,40 @@ def verify_session_token(session_token: str, db: Session) -> User:
         return None
     return user
 
-# Endpoint de registro de usuario
+import re
+
+# Función auxiliar para validar la contraseña
+def validate_password_strength(password: str) -> bool:
+    # La contraseña debe tener al menos:
+    # - 8 caracteres
+    # - 1 letra mayúscula
+    # - 1 letra minúscula
+    # - 1 número
+    # - 1 carácter especial
+    if (len(password) >= 8 and
+        re.search(r'[A-Z]', password) and
+        re.search(r'[a-z]', password) and
+        re.search(r'[0-9]', password) and
+        re.search(r'[\W_]', password)):
+        return True
+    return False
+
+# Modificación del endpoint de registro
 @router.post("/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
+    # Validación del nombre (no puede estar vacío)
+    if not user.name.strip():
+        return create_response("error", "El nombre no puede estar vacío")
+    
+    # Validación del correo (ya está validado con EmailStr en Pydantic)
+    
+    # Validación de la contraseña
     if user.password != user.passwordConfirmation:
         return create_response("error", "Las contraseñas no coinciden")
-
+    
+    if not validate_password_strength(user.password):
+        return create_response("error", "La contraseña debe tener al menos 8 caracteres, incluir una letra mayúscula, una letra minúscula, un número y un carácter especial")
+    
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         return create_response("error", "El correo ya está registrado")
@@ -88,11 +119,28 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
         password_hash = hash_password(user.password)
         verification_token = generate_verification_token(8)
 
+        # Consulta para obtener el status_type_id del tipo "User"
+        status_type_record = db.query(StatusType).filter(StatusType.name == "User").first()
+
+        if not status_type_record:
+            raise HTTPException(status_code=400, detail="No se encontró el tipo de estado 'User'.")
+
+        # Consulta para obtener el status_id de "No Verificado"
+        status_record = db.query(Status).filter(
+            Status.name == "No Verificado",
+            Status.status_type_id == status_type_record.status_type_id
+        ).first()
+
+        if not status_record:
+            raise HTTPException(status_code=400, detail="No se encontró el estado 'No Verificado' para tipo 'User'.")
+
+        # Crear el nuevo usuario con estado "No Verificado"
         new_user = User(
             name=user.name,
             email=user.email,
             password_hash=password_hash,
-            verification_token=verification_token
+            verification_token=verification_token,
+            status_id=status_record.status_id  # Asignamos el status_id dinámicamente
         )
 
         db.add(new_user)
@@ -106,21 +154,43 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al registrar usuario o enviar correo: {str(e)}")
 
-# Verificar email
+
+
 @router.post("/verify")
 def verify_email(request: VerifyTokenRequest, db: Session = Depends(get_db_session)):
-    user = db.query(User).filter(User.verification_token == request.token, User.is_verified == False).first()
+    user = db.query(User).filter(User.verification_token == request.token).first()
+    
     if not user:
-        return create_response("error", "Token invalido o expirado")
-
+        return create_response("error", "Token inválido o expirado")
+    
     try:
-        user.is_verified = True
+        # Consulta para obtener el status_type_id del tipo "User"
+        status_type_record = db.query(StatusType).filter(StatusType.name == "User").first()
+        if not status_type_record:
+            raise HTTPException(status_code=400, detail="No se encontró el tipo de estado 'User'.")
+        
+        # Obtener el estado "Verificado"
+        status_verified = db.query(Status).filter(
+            Status.name == "Verificado",
+            Status.status_type_id == status_type_record.status_type_id
+        ).first()
+        
+        if not status_verified:
+            raise HTTPException(status_code=400, detail="No se encontró el estado 'Verificado'.")
+
+        # Actualizar el usuario: marcar como verificado y cambiar el status_id
         user.verification_token = None
+        user.status_id = status_verified.status_id
+        
+        # Guardar los cambios en la base de datos
         db.commit()
+        
         return create_response("success", "Correo electrónico verificado exitosamente")
+    
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error verifying email: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al verificar el correo: {str(e)}")
+
 
 # Declaración global del diccionario
 reset_tokens = {}
@@ -210,6 +280,10 @@ def reset_password(reset: PasswordReset, db: Session = Depends(get_db_session)):
         logger.warning("Las contraseñas no coinciden para el token: %s", reset.token)
         return create_response("error", "Las contraseñas no coinciden")
 
+    # Validar que la nueva contraseña cumpla con los requisitos de seguridad
+    if not validate_password_strength(reset.new_password):
+        return create_response("error", "La nueva contraseña debe tener al menos 8 caracteres, incluir una letra mayúscula, una letra minúscula, un número y un carácter especial")
+
     # Verificar el token en el diccionario en memoria
     token_info = reset_tokens.get(reset.token)
 
@@ -224,7 +298,7 @@ def reset_password(reset: PasswordReset, db: Session = Depends(get_db_session)):
         if current_time > expires_at:
             logger.info("El token ha expirado: %s", reset.token)
             del reset_tokens[reset.token]  # Eliminar token expirado
-            return create_response("error", "Token ha expirado")
+            return create_response("error", "El token ha expirado")
 
         # Obtener el usuario de la base de datos usando el token
         user = db.query(User).filter(User.verification_token == reset.token).first()
@@ -255,23 +329,23 @@ def reset_password(reset: PasswordReset, db: Session = Depends(get_db_session)):
         except Exception as e:
             logger.error("Error al restablecer la contraseña: %s", str(e))
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"Error resetting password: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error al restablecer la contraseña: {str(e)}")
     else:
         logger.warning("Token inválido o expirado: %s", reset.token)
         return create_response("error", "Token inválido o expirado")
 
 
-# Inicio de sesión
 @router.post("/login")
 def login(request: LoginRequest, db: Session = Depends(get_db_session)):
     user = db.query(User).filter(User.email == request.email).first()
-    
+
     if not user or not verify_password(request.password, user.password_hash):
         return create_response("error", "Credenciales incorrectas")
-    
-    if not user or not user.is_verified:
+
+    # Verificar si el usuario está en estado "Verificado"
+    status_verified = db.query(Status).filter(Status.name == "Verificado").first()
+    if user.status_id != status_verified.status_id:
         return create_response("error", "Debes verificar tu correo antes de iniciar sesión")
-    
     
     try:
         session_token = generate_verification_token(32)
@@ -282,12 +356,17 @@ def login(request: LoginRequest, db: Session = Depends(get_db_session)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error during login: {str(e)}")
 
+
 # Cambiar contraseña
 @router.put("/change-password")
 def change_password(change: PasswordChange, session_token: str, db: Session = Depends(get_db_session)):
     user = verify_session_token(session_token, db)
     if not user or not verify_password(change.current_password, user.password_hash):
         return create_response("error", "Credenciales incorrectas")
+
+    # Validar que la nueva contraseña cumpla con los requisitos de seguridad
+    if not validate_password_strength(change.new_password):
+        return create_response("error", "La nueva contraseña debe tener al menos 8 caracteres, incluir una letra mayúscula, una letra minúscula, un número y un carácter especial")
 
     try:
         new_password_hash = hash_password(change.new_password)
@@ -296,7 +375,8 @@ def change_password(change: PasswordChange, session_token: str, db: Session = De
         return create_response("success", "Cambio de contraseña exitoso")
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error changing password: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al cambiar la contraseña: {str(e)}")
+
 
 # Cerrar sesión
 @router.post("/logout")
@@ -328,12 +408,15 @@ def delete_account(session_token: str, db: Session = Depends(get_db_session)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error deleting account: {str(e)}")
 
-# Actualizar perfil
 @router.post("/update-profile")
 def update_profile(profile: UpdateProfile, session_token: str, db: Session = Depends(get_db_session)):
     user = verify_session_token(session_token, db)
     if not user:
-        return create_response("error", "Token de sesion invalido")
+        return create_response("error", "Token de sesión inválido")
+    
+    # Validación de que el nuevo nombre no sea vacío
+    if not profile.new_name.strip():
+        return create_response("error", "El nombre no puede estar vacío")
 
     try:
         # Solo actualizamos el nombre del usuario
@@ -342,4 +425,4 @@ def update_profile(profile: UpdateProfile, session_token: str, db: Session = Dep
         return create_response("success", "Perfil actualizado exitosamente")
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al actualizar el perfil: {str(e)}")
