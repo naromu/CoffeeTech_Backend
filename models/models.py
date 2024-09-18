@@ -41,6 +41,9 @@ class Role(Base):
 
     role_id = Column(Integer, primary_key=True)
     name = Column(String(50), nullable=False, unique=True)
+    
+     # Relación con RolePermission (permisos asociados a este rol)
+    permissions = relationship("RolePermission", back_populates="role")
 
 # Modelo para UnitOfMeasureType
 class UnitOfMeasureType(Base):
@@ -106,3 +109,26 @@ class User(Base):
 
     # Relación con Status (usando una cadena para resolver el nombre de la clase)
     status = relationship("Status", back_populates="users")
+
+# Modelo para Permission
+class Permission(Base):
+    __tablename__ = 'permission'
+
+    permission_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    description = Column(String(200), nullable=False)
+    name = Column(String(50), nullable=True, unique=True)
+
+    # Relación con RolePermission (roles asociados a este permiso)
+    roles = relationship("RolePermission", back_populates="permission")
+
+
+# Modelo para RolePermission (relación entre roles y permisos)
+class RolePermission(Base):
+    __tablename__ = 'role_permission'
+
+    role_id = Column(Integer, ForeignKey('role.role_id'), primary_key=True, nullable=False)
+    permission_id = Column(Integer, ForeignKey('permission.permission_id'), primary_key=True, nullable=False)
+
+    # Relaciones con Role y Permission
+    role = relationship("Role", back_populates="permissions")
+    permission = relationship("Permission", back_populates="roles")

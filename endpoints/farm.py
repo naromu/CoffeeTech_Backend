@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from models.models import Farm, UserRoleFarm, User, UnitOfMeasure, Role, Status, StatusType
+from models.models import Farm, UserRoleFarm, User, UnitOfMeasure, Role, Status, StatusType, Permission, RolePermission
 from utils.security import verify_session_token
 from dataBase import get_db_session
 import logging
@@ -181,15 +181,25 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
         logger.warning("Token de sesión inválido o usuario no encontrado")
         return create_response("error", "Token de sesión inválido o usuario no encontrado")
 
-    # Validación de existencia de la finca
-    farm = db.query(Farm).join(UserRoleFarm).filter(
-        Farm.farm_id == request.farm_id,
+    # Validación de existencia de la finca y obtención del rol del usuario en la finca
+    user_role_farm = db.query(UserRoleFarm).filter(
+        UserRoleFarm.farm_id == request.farm_id,
         UserRoleFarm.user_id == user.user_id
     ).first()
 
-    if not farm:
+    if not user_role_farm:
         logger.warning("Finca no encontrada o no pertenece al usuario")
         return create_response("error", "Finca no encontrada o no pertenece al usuario")
+
+    # Verificar permisos para el rol del usuario
+    role_permission = db.query(RolePermission).join(Permission).filter(
+        RolePermission.role_id == user_role_farm.role_id,
+        Permission.name == "edit_farm"
+    ).first()
+
+    if not role_permission:
+        logger.warning("El rol del usuario no tiene permiso para editar la finca")
+        return create_response("error", "No tienes permiso para editar esta finca")
 
     # Validación 1: El nombre de la finca no puede estar vacío ni contener solo espacios
     if not request.name or not request.name.strip():
@@ -214,6 +224,7 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
 
     try:
         # Actualizar la finca
+        farm = db.query(Farm).filter(Farm.farm_id == request.farm_id).first()
         farm.name = request.name
         farm.area = request.area
         farm.area_unit_id = unit_of_measure.unit_of_measure_id
@@ -232,4 +243,3 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
         db.rollback()
         logger.error("Error al actualizar la finca: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Error al actualizar la finca: {str(e)}")
-    
