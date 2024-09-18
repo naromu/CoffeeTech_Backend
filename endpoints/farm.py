@@ -256,3 +256,52 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
         db.rollback()
         logger.error("Error al actualizar la finca: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Error al actualizar la finca: {str(e)}")
+
+
+
+@router.get("/get-farm/{farm_id}")
+def get_farm(farm_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    # Verificar el token de sesión
+    user = verify_session_token(session_token, db)
+    if not user:
+        logger.warning("Token de sesión inválido o usuario no encontrado")
+        return create_response("error", "Token de sesión inválido o usuario no encontrado")
+
+    try:
+        # Consultar la finca específica por su ID
+        farm_data = db.query(Farm, UnitOfMeasure, Status, Role).select_from(UserRoleFarm).join(
+            Farm, UserRoleFarm.farm_id == Farm.farm_id
+        ).join(
+            UnitOfMeasure, Farm.area_unit_id == UnitOfMeasure.unit_of_measure_id
+        ).join(
+            Status, Farm.status_id == Status.status_id
+        ).join(
+            Role, UserRoleFarm.role_id == Role.role_id
+        ).filter(
+            UserRoleFarm.user_id == user.user_id,
+            Farm.farm_id == farm_id
+        ).first()
+
+        # Validar si se encontró la finca
+        if not farm_data:
+            logger.warning("Finca no encontrada o no pertenece al usuario")
+            return create_response("error", "Finca no encontrada o no pertenece al usuario")
+
+        farm, unit_of_measure, status, role = farm_data
+
+        # Crear la respuesta en el formato esperado
+        farm_response = ListFarmResponse(
+            farm_id=farm.farm_id,
+            name=farm.name,
+            area=farm.area,
+            unit_of_measure=unit_of_measure.name,
+            status=status.name,
+            role=role.name
+        )
+
+        return create_response("success", "Finca obtenida exitosamente", {"farm": farm_response})
+
+    except Exception as e:
+        # Log detallado para administradores, pero respuesta genérica para el usuario
+        logger.error("Error al obtener la finca: %s", str(e))
+        return create_response("error", "Ocurrió un error al intentar obtener la finca. Por favor, inténtalo de nuevo más tarde.")
