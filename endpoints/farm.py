@@ -185,7 +185,6 @@ def list_farm(session_token: str, db: Session = Depends(get_db_session)):
 
     
     
-
 @router.post("/update-farm")
 def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = Depends(get_db_session)):
     # Verificar el token de sesión
@@ -194,15 +193,15 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
         logger.warning("Token de sesión inválido o usuario no encontrado")
         return create_response("error", "Token de sesión inválido o usuario no encontrado")
 
-    # Validación de existencia de la finca y obtención del rol del usuario en la finca
+    # Verificar si el usuario está asociado con la finca
     user_role_farm = db.query(UserRoleFarm).filter(
         UserRoleFarm.farm_id == request.farm_id,
         UserRoleFarm.user_id == user.user_id
     ).first()
 
     if not user_role_farm:
-        logger.warning("Finca no encontrada o no pertenece al usuario")
-        return create_response("error", "Finca no encontrada o no pertenece al usuario")
+        logger.warning("El usuario no está asociado con la finca que intenta editar")
+        return create_response("error", "No tienes permiso para editar esta finca porque no estás asociado con ella")
 
     # Verificar permisos para el rol del usuario
     role_permission = db.query(RolePermission).join(Permission).filter(
@@ -236,8 +235,23 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
         return create_response("error", "Unidad de medida no válida")
 
     try:
-        # Actualizar la finca
+        # Buscar la finca que se está intentando actualizar
         farm = db.query(Farm).filter(Farm.farm_id == request.farm_id).first()
+        if not farm:
+            logger.warning("Finca no encontrada")
+            return create_response("error", "Finca no encontrada")
+
+        # Verificar si el nuevo nombre ya está en uso por otra finca
+        existing_farm = db.query(Farm).filter(
+            Farm.name == request.name,
+            Farm.farm_id != request.farm_id
+        ).first()
+
+        if existing_farm:
+            logger.warning("El nombre de la finca ya está en uso por otra finca")
+            return create_response("error", "El nombre de la finca ya está en uso por otra finca")
+
+        # Actualizar la finca
         farm.name = request.name
         farm.area = request.area
         farm.area_unit_id = unit_of_measure.unit_of_measure_id
@@ -256,3 +270,4 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
         db.rollback()
         logger.error("Error al actualizar la finca: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Error al actualizar la finca: {str(e)}")
+
