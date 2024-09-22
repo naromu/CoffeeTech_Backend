@@ -5,18 +5,15 @@ from dataBase import get_db_session
 
 router = APIRouter()
 
-@router.get("/list-roles", summary="Obtener lista de roles", description="Obtiene una lista de todos los roles disponibles junto con sus permisos asociados.")
+
+
+
+@router.get("/list-roles")
 def list_roles(db: Session = Depends(get_db_session)):
-    """
-    Obtiene una lista de todos los roles disponibles junto con sus permisos asociados.
-
-    Args:
-        db (Session): Sesión de base de datos proporcionada por la dependencia.
-
-    Returns:
-        dict: Diccionario con el estado, mensaje y datos de los roles y sus permisos.
-    """
+    # Consulta los roles y carga los permisos asociados utilizando `joinedload`
     roles = db.query(Role).all()
+
+    # Construir la respuesta con roles y sus permisos
 
     return {
         "status": "success",
@@ -36,7 +33,11 @@ def list_roles(db: Session = Depends(get_db_session)):
         ]
     }
 
-@router.get("/unit-measure", summary="Obtener lista de unidades de medida", description="Obtiene una lista de todas las unidades de medida disponibles junto con su tipo correspondiente.")
+
+
+
+@router.get("/unit-measure")
+
 def list_unit_measures(db: Session = Depends(get_db_session)):
     """
     Obtiene una lista de todas las unidades de medida disponibles junto con su tipo correspondiente.

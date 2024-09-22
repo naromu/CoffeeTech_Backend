@@ -18,10 +18,13 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
+import random
+import string
 
+def generate_verification_token(length: int) -> str:
+    characters = string.ascii_letters + string.digits  # Letras mayúsculas, minúsculas y dígitos
+    return ''.join(random.choices(characters, k=length))
 
-def generate_verification_token(long) -> str:
-    return secrets.token_urlsafe(long)
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

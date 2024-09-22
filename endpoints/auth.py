@@ -117,7 +117,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
 
     try:
         password_hash = hash_password(user.password)
-        verification_token = generate_verification_token(8)
+        verification_token = generate_verification_token(4)
 
         # Consulta para obtener el status_type_id del tipo "User"
         status_type_record = db.query(StatusType).filter(StatusType.name == "User").first()
@@ -208,7 +208,7 @@ def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_
 
     try:
         # Genera un token único para restablecer la contraseña
-        reset_token = generate_verification_token(8)
+        reset_token = generate_verification_token(4)
         logger.info("Token de restablecimiento generado: %s", reset_token)
 
         # Configura el tiempo de expiración para 15 minutos en el futuro
@@ -345,8 +345,21 @@ def login(request: LoginRequest, db: Session = Depends(get_db_session)):
     # Verificar si el usuario está en estado "Verificado"
     status_verified = db.query(Status).filter(Status.name == "Verificado").first()
     if user.status_id != status_verified.status_id:
-        return create_response("error", "Debes verificar tu correo antes de iniciar sesión")
-    
+        # Usuario no verificado, generar un nuevo token de verificación
+        new_verification_token = generate_verification_token(4)
+        user.verification_token = new_verification_token
+
+        try:
+            # Guardar el nuevo token en la base de datos
+            db.commit()
+            # Enviar correo con el nuevo token de verificación
+            send_email(user.email, new_verification_token, 'verification')
+
+            return create_response("error", "Debes verificar tu correo antes de iniciar sesión")
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Error al enviar el nuevo correo de verificación: {str(e)}")
+
     try:
         session_token = generate_verification_token(32)
         user.session_token = session_token
@@ -354,7 +367,7 @@ def login(request: LoginRequest, db: Session = Depends(get_db_session)):
         return create_response("success", "Inicio de sesión exitoso", {"session_token": session_token, "name": user.name})
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error during login: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error durante el inicio de sesión: {str(e)}")
 
 
 # Cambiar contraseña
