@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
-from models.models import Farm, UserRoleFarm, User, UnitOfMeasure, Role, Status, StatusType, Permission, RolePermission
+from models.models import Farm, UserRoleFarm, User, UnitOfMeasure, Role, Status, StatusType, Permission, RolePermission, Invitation
 from utils.security import verify_session_token
 from dataBase import get_db_session
 import logging
 from typing import Any, Dict, List
+from utils.email import send_email
 
 
 
@@ -319,5 +320,5 @@ def get_farm(farm_id: int, session_token: str, db: Session = Depends(get_db_sess
     except Exception as e:
         # Log detallado para administradores, pero respuesta genérica para el usuario
         logger.error("Error al obtener la finca: %s", str(e))
-        return create_response("error", "Ocurrió un error al intentar obtener la finca. Por favor, inténtalo de nuevo más tarde.")
+        return create_response("error", "Ocurrió un error al intentar obtener la finca. Por favor, inténtalo de nuevo más tarde.")   
 

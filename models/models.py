@@ -1,6 +1,6 @@
 
 
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey,  CheckConstraint, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -19,6 +19,8 @@ class Farm(Base):
     # Relaciones
     area_unit = relationship("UnitOfMeasure")
     status = relationship("Status")
+    invitations = relationship("Invitation", back_populates="farm")
+    user_roles_farms = relationship('UserRoleFarm', back_populates='farm')
 
 # Modelo para UserRoleFarm (relación entre usuarios, roles y fincas)
 class UserRoleFarm(Base):
@@ -30,9 +32,10 @@ class UserRoleFarm(Base):
     farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)
 
     # Relaciones
-    role = relationship("Role")
-    user = relationship("User")
-    farm = relationship("Farm")
+    # Relaciones con las otras tablas
+    user = relationship('User', back_populates='user_roles_farms')
+    farm = relationship('Farm', back_populates='user_roles_farms')
+    role = relationship('Role', back_populates='user_roles_farms')
 
 
 # Modelo para Role
@@ -44,6 +47,7 @@ class Role(Base):
     
      # Relación con RolePermission (permisos asociados a este rol)
     permissions = relationship("RolePermission", back_populates="role")
+    user_roles_farms = relationship('UserRoleFarm', back_populates='role')
 
 # Modelo para UnitOfMeasureType
 class UnitOfMeasureType(Base):
@@ -109,6 +113,8 @@ class User(Base):
 
     # Relación con Status (usando una cadena para resolver el nombre de la clase)
     status = relationship("Status", back_populates="users")
+    user_roles_farms = relationship('UserRoleFarm', back_populates='user') 
+    notifications = relationship("Notification", back_populates="user")
 
 # Modelo para Permission
 class Permission(Base):
@@ -132,3 +138,34 @@ class RolePermission(Base):
     # Relaciones con Role y Permission
     role = relationship("Role", back_populates="permissions")
     permission = relationship("Permission", back_populates="roles")
+    
+# Modelo para Invitation (Invitación)
+class Invitation(Base):
+    __tablename__ = 'invitation'
+
+    invitation_id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(150), nullable=False)
+    suggested_role = Column(String(50), nullable=False)
+    status = Column(String(50), nullable=False)
+    farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)
+
+    # Relación con Farm
+    farm = relationship("Farm", back_populates="invitations")
+    
+
+class Notification(Base):
+    __tablename__ = 'notifications'
+    
+    notifications_id = Column(Integer, primary_key=True, autoincrement=True)
+    message = Column(String(255), nullable=True)
+    date = Column(DateTime, nullable=True)
+    is_read = Column(Boolean, nullable=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+
+    # Check constraint for 'is_read' field
+    __table_args__ = (
+        CheckConstraint("is_read IN (true, false)", name="chk_is_read"),
+    )
+
+    # Relación con la tabla 'users'
+    user = relationship("User", back_populates="notifications")
