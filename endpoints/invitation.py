@@ -8,6 +8,7 @@ from dataBase import get_db_session
 import logging
 from typing import Any, Dict, List
 from utils.email import send_email
+from utils.FCM import send_fcm_notification
 
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
@@ -71,7 +72,7 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
     if not user_role_farm:
         return create_response("error", "No tienes acceso a esta finca", status_code=403)
 
-    # Ahora sabemos que el usuario pertenece a la finca, obtenemos su rol
+    # Obtener el rol del usuario
     role_id = user_role_farm.role_id
 
     # Verificar el rol sugerido para la invitación
@@ -81,7 +82,6 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
 
     # Verificar si el rol del usuario tiene el permiso adecuado para invitar al rol sugerido
     if suggested_role.name == "Administrador de finca":
-        # Verificar si el rol del usuario tiene el permiso para agregar administradores
         has_permission_to_invite = db.query(RolePermission).join(Permission).filter(
             RolePermission.role_id == role_id,
             Permission.name == "add_administrador_farm"
@@ -90,7 +90,6 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
             return create_response("error", "No tienes permiso para invitar a un Administrador de Finca", status_code=403)
 
     elif suggested_role.name == "Operador de campo":
-        # Verificar si el rol del usuario tiene el permiso para agregar operadores
         has_permission_to_invite = db.query(RolePermission).join(Permission).filter(
             RolePermission.role_id == role_id,
             Permission.name == "add_operador_farm"
@@ -101,10 +100,13 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
     else:
         return create_response("error", "No puedes invitar", status_code=403)
 
-    # Verificar si el usuario que está siendo invitado ya pertenece a la finca con estado activo
+    # Verificar si el usuario ya pertenece a la finca
     existing_user = db.query(User).filter(User.email == invitation_data.email).first()
     if not existing_user:
         return create_response("error", "El usuario no está registrado", status_code=404)
+
+    # Obtener el FCM token del usuario
+    fcm_token = existing_user.fcm_token  # Asegúrate de que este campo esté presente en la tabla `users`
 
     existing_role_farm = db.query(UserRoleFarm).join(Status, UserRoleFarm.status_id == Status.status_id).join(
         StatusType, Status.status_type_id == StatusType.status_type_id).filter(
@@ -129,13 +131,20 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
 
         # Enviar correo de invitación
         send_email(invitation_data.email, invitation_data.farm_id, 'invitation', farm.name, user.name, invitation_data.suggested_role)
+
+        # Enviar notificación FCM al usuario
+        if fcm_token:
+            title = "Nueva Invitación"
+            body = f"Has sido invitado como {invitation_data.suggested_role} a la finca {farm.name}"
+            send_fcm_notification(fcm_token, title, body)
+        else:
+            logger.warning("No se pudo enviar la notificación push. No se encontró el token FCM del usuario.")
     except Exception as e:
         db.rollback()  # Hacer rollback en caso de un error
         logger.error(f"Error creando la invitación: {str(e)}")
         return create_response("error", f"Error creando la invitación: {str(e)}", status_code=500)
 
     return create_response("success", "Invitación creada exitosamente", {"invitation_id": new_invitation.invitation_id}, status_code=201)
-
 
 @router.post("/accept-invitation")
 def accept_invitation(invitation_id: int, session_token: str, db: Session = Depends(get_db_session)):
