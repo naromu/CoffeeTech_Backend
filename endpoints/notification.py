@@ -23,7 +23,7 @@ def accept_invitation(
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
-        session_token_invalid_response()
+        return session_token_invalid_response()
 
     # Verificar si la invitación existe
     invitation = db.query(Invitation).filter(Invitation.invitation_id == invitation_id).first()

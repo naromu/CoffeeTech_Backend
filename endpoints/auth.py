@@ -391,7 +391,7 @@ def change_password(change: PasswordChange, session_token: str, db: Session = De
 def logout(request: LogoutRequest, db: Session = Depends(get_db_session)):
     user = verify_session_token(request.session_token, db)
     if not user:
-        session_token_invalid_response()
+        return session_token_invalid_response()
     try:
         user.session_token = None
         db.commit()
@@ -405,7 +405,7 @@ def logout(request: LogoutRequest, db: Session = Depends(get_db_session)):
 def delete_account(session_token: str, db: Session = Depends(get_db_session)):
     user = verify_session_token(session_token, db)
     if not user:
-        session_token_invalid_response()
+        return session_token_invalid_response()
 
     try:
         db.delete(user)
@@ -419,7 +419,7 @@ def delete_account(session_token: str, db: Session = Depends(get_db_session)):
 def update_profile(profile: UpdateProfile, session_token: str, db: Session = Depends(get_db_session)):
     user = verify_session_token(session_token, db)
     if not user:
-        session_token_invalid_response()
+        return session_token_invalid_response()
     
     # Validación de que el nuevo nombre no sea vacío
     if not profile.new_name.strip():

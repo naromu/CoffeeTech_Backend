@@ -45,7 +45,7 @@ def create_farm(request: CreateFarmRequest, session_token: str, db: Session = De
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
-        session_token_invalid_response()
+        return session_token_invalid_response()
     
     # Validación 1: El nombre de la finca no puede estar vacío ni contener solo espacios
     if not request.name or not request.name.strip():
@@ -146,7 +146,7 @@ def list_farm(session_token: str, db: Session = Depends(get_db_session)):
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
-        session_token_invalid_response()
+        return session_token_invalid_response()
 
     try:
         # Hacer la consulta explícita usando select_from y definir bien los joins
@@ -188,7 +188,7 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
-        session_token_invalid_response()
+        return session_token_invalid_response()
 
     # Verificar si el usuario está asociado con la finca
     user_role_farm = db.query(UserRoleFarm).filter(
@@ -277,7 +277,7 @@ def get_farm(farm_id: int, session_token: str, db: Session = Depends(get_db_sess
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
-        session_token_invalid_response()
+        return session_token_invalid_response()
 
     try:
         # Consultar la finca específica por su ID
