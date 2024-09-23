@@ -387,18 +387,21 @@ def change_password(change: PasswordChange, session_token: str, db: Session = De
 
 
 # Cerrar sesión
+# Cerrar sesión
 @router.post("/logout")
 def logout(request: LogoutRequest, db: Session = Depends(get_db_session)):
     user = verify_session_token(request.session_token, db)
     if not user:
         return session_token_invalid_response()
     try:
-        user.session_token = None
+        user.session_token = None  # Borrar el session_token
+        user.fcm_token = None  # Borrar el fcm_token también
         db.commit()
         return create_response("success", "Cierre de sesión exitoso")
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error during logout: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error durante el cierre de sesión: {str(e)}")
+
 
 # Eliminar cuenta
 @router.delete("/delete-account")
