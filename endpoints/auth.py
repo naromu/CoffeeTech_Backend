@@ -40,6 +40,7 @@ class PasswordReset(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    fcm_token: str  # Campo agregado para recibir el token FCM
 
 class PasswordChange(BaseModel):
     current_password: str
@@ -363,6 +364,7 @@ def login(request: LoginRequest, db: Session = Depends(get_db_session)):
     try:
         session_token = generate_verification_token(32)
         user.session_token = session_token
+        user.fcm_token = request.fcm_token  # Guardar el token FCM del usuario
         db.commit()
         return create_response("success", "Inicio de sesión exitoso", {"session_token": session_token, "name": user.name})
     except Exception as e:

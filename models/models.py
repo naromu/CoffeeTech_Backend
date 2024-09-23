@@ -22,6 +22,8 @@ class Farm(Base):
     invitations = relationship("Invitation", back_populates="farm")
     user_roles_farms = relationship('UserRoleFarm', back_populates='farm')
 
+
+    
 # Modelo para UserRoleFarm (relación entre usuarios, roles y fincas)
 class UserRoleFarm(Base):
     __tablename__ = 'user_role_farm'
@@ -30,12 +32,14 @@ class UserRoleFarm(Base):
     role_id = Column(Integer, ForeignKey('role.role_id'), nullable=False)
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
     farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)
+    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False, default=24)  # Nuevo campo status_id
 
     # Relaciones
-    # Relaciones con las otras tablas
     user = relationship('User', back_populates='user_roles_farms')
     farm = relationship('Farm', back_populates='user_roles_farms')
     role = relationship('Role', back_populates='user_roles_farms')
+    status = relationship('Status')  # Relación con la tabla 'Status'
+
 
 
 # Modelo para Role
@@ -100,6 +104,7 @@ class Status(Base):
 
 
 # Definición del modelo User
+# Definición del modelo User
 class User(Base):
     __tablename__ = "users"
 
@@ -109,12 +114,14 @@ class User(Base):
     password_hash = Column(String(60), nullable=False)
     verification_token = Column(String(50), nullable=True)
     session_token = Column(String(50), nullable=True)
+    fcm_token = Column(String(255), nullable=True)  # Agregar el campo FCM token
     status_id = Column(Integer, ForeignKey("status.status_id"), nullable=False)
 
-    # Relación con Status (usando una cadena para resolver el nombre de la clase)
+    # Relación con Status
     status = relationship("Status", back_populates="users")
     user_roles_farms = relationship('UserRoleFarm', back_populates='user') 
     notifications = relationship("Notification", back_populates="user")
+
 
 # Modelo para Permission
 class Permission(Base):
@@ -146,11 +153,13 @@ class Invitation(Base):
     invitation_id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String(150), nullable=False)
     suggested_role = Column(String(50), nullable=False)
-    status = Column(String(50), nullable=False)
+    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False, default=24)  # Cambiado de 'status' a 'status_id'
     farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)
 
-    # Relación con Farm
+    # Relaciones
     farm = relationship("Farm", back_populates="invitations")
+    status = relationship("Status")  # Relación con la tabla 'Status'
+
     
 
 class Notification(Base):
