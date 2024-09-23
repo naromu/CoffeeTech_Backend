@@ -53,8 +53,7 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
     # Validar el session_token y obtener el usuario autenticado
     user = verify_session_token(session_token, db)
     if not user:
-        return create_response("error", "Token inválido o expirado", status_code=400)
-
+        session_token_invalid_response()
     # Verificar si la finca existe
     farm = db.query(Farm).filter(Farm.farm_id == invitation_data.farm_id).first()
     if not farm:
@@ -150,7 +149,7 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
 def accept_invitation(invitation_id: int, session_token: str, db: Session = Depends(get_db_session)):
     user = verify_session_token(session_token, db)
     if not user:
-        return create_response("error", "Token inválido o expirado", status_code=400)
+        session_token_invalid_response()
 
     invitation = db.query(Invitation).filter(Invitation.invitation_id == invitation_id).first()
     if not invitation:
@@ -188,7 +187,7 @@ def accept_invitation(invitation_id: int, session_token: str, db: Session = Depe
 def reject_invitation(invitation_id: int, session_token: str, db: Session = Depends(get_db_session)):
     user = verify_session_token(session_token, db)
     if not user:
-        return create_response("error", "Token inválido o expirado", status_code=400)
+        session_token_invalid_response()
 
     invitation = db.query(Invitation).filter(Invitation.invitation_id == invitation_id).first()
     if not invitation:

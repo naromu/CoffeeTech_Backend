@@ -9,6 +9,9 @@ from utils.email import send_email
 
 router = APIRouter()
 
+from utils.response import session_token_invalid_response
+from utils.response import create_response
+
 @router.post("/notification/accept-invitation")
 def accept_invitation(
     session_token: str, 
@@ -19,7 +22,8 @@ def accept_invitation(
     # Validar el session_token y obtener el usuario
     user = verify_session_token(session_token, db)
     if not user:
-        raise HTTPException(status_code=400, detail="Token inválido o expirado")
+        logger.warning("Token de sesión inválido o usuario no encontrado")
+        session_token_invalid_response()
 
     # Verificar si la invitación existe
     invitation = db.query(Invitation).filter(Invitation.invitation_id == invitation_id).first()

@@ -7,7 +7,8 @@ from dataBase import get_db_session
 import logging
 from typing import Any, Dict, List
 from utils.email import send_email
-
+from utils.response import session_token_invalid_response
+from utils.response import create_response
 
 
 # Configuración básica de logging
@@ -36,12 +37,7 @@ class UpdateFarmRequest(BaseModel):
     unitMeasure: str
 
 # Función auxiliar para crear una respuesta uniforme
-def create_response(status: str, message: str, data: Dict[str, Any] = None):
-    return {
-        "status": status,
-        "message": message,
-        "data": data or {}
-    }
+
 
 @router.post("/create-farm")
 def create_farm(request: CreateFarmRequest, session_token: str, db: Session = Depends(get_db_session)):
@@ -49,7 +45,7 @@ def create_farm(request: CreateFarmRequest, session_token: str, db: Session = De
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
-        return create_response("error", "Token de sesión inválido o usuario no encontrado")
+        session_token_invalid_response()
     
     # Validación 1: El nombre de la finca no puede estar vacío ni contener solo espacios
     if not request.name or not request.name.strip():
@@ -57,9 +53,9 @@ def create_farm(request: CreateFarmRequest, session_token: str, db: Session = De
         return create_response("error", "El nombre de la finca no puede estar vacío")
 
     # Validación 2: El nombre no puede exceder los 100 caracteres
-    if len(request.name) > 100:
+    if len(request.name) > 50:
         logger.warning("El nombre de la finca es demasiado largo")
-        return create_response("error", "El nombre de la finca no puede tener más de 100 caracteres")
+        return create_response("error", "El nombre de la finca no puede tener más de 50 caracteres")
 
     # Validación 3: El área no puede ser negativa ni cero
     if request.area <= 0:
@@ -79,7 +75,7 @@ def create_farm(request: CreateFarmRequest, session_token: str, db: Session = De
 
     if existing_farm:
         logger.warning("El usuario ya tiene una finca con el nombre '%s'", request.name)
-        return create_response("error", f"Ya existe una finca con el nombre '{request.name}' para este usuario")
+        return create_response("error", f"Ya existe una finca con el nombre '{request.name}' para el propietario")
 
     # Buscar la unidad de medida (unitMeasure)
     unit_of_measure = db.query(UnitOfMeasure).filter(UnitOfMeasure.name == request.unitMeasure).first()
@@ -150,7 +146,7 @@ def list_farm(session_token: str, db: Session = Depends(get_db_session)):
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
-        return create_response("error", "Token de sesión inválido o usuario no encontrado")
+        session_token_invalid_response()
 
     try:
         # Hacer la consulta explícita usando select_from y definir bien los joins
@@ -192,7 +188,7 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
-        return create_response("error", "Token de sesión inválido o usuario no encontrado")
+        session_token_invalid_response()
 
     # Verificar si el usuario está asociado con la finca
     user_role_farm = db.query(UserRoleFarm).filter(
@@ -220,9 +216,9 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
         return create_response("error", "El nombre de la finca no puede estar vacío")
 
     # Validación 2: El nombre no puede exceder los 100 caracteres
-    if len(request.name) > 100:
+    if len(request.name) > 50:
         logger.warning("El nombre de la finca es demasiado largo")
-        return create_response("error", "El nombre de la finca no puede tener más de 100 caracteres")
+        return create_response("error", "El nombre de la finca no puede tener más de 50 caracteres")
 
     # Validación 3: El área no puede ser negativa ni cero
     if request.area <= 0:
@@ -281,7 +277,7 @@ def get_farm(farm_id: int, session_token: str, db: Session = Depends(get_db_sess
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
-        return create_response("error", "Token de sesión inválido o usuario no encontrado")
+        session_token_invalid_response()
 
     try:
         # Consultar la finca específica por su ID
