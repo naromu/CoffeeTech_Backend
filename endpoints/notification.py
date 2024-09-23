@@ -1,65 +1,43 @@
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from models.models import  UserRoleFarm,  Invitation
+from typing import List, Optional
+from datetime import datetime
+
+from models.models import Notification, User
 from utils.security import verify_session_token
 from dataBase import get_db_session
-import logging
-from utils.email import send_email
+from pydantic import BaseModel
+
+from utils.response import create_response, session_token_invalid_response
 
 router = APIRouter()
 
-from utils.response import session_token_invalid_response
-from utils.response import create_response
+# Pydantic model para la respuesta de notificación
+class NotificationResponse(BaseModel):
+    notifications_id: int
+    message: Optional[str]
+    date: datetime
+    type: str
+    invitation_id: Optional[int]
+    farm_id: Optional[int]
+    reminder_time: Optional[datetime]
+    is_responded: Optional[bool]
 
-@router.post("/notification/accept-invitation")
-def accept_invitation(
-    session_token: str, 
-    invitation_id: int, 
-    response: str,  # 'aceptar' o 'rechazar'
-    db: Session = Depends(get_db_session)
-):
-    # Validar el session_token y obtener el usuario
+    class Config:
+        from_attributes = True
+
+@router.get("/get-notification")
+def get_notifications(session_token: str, db: Session = Depends(get_db_session)):
+    # Verificar el session_token y obtener el usuario autenticado
     user = verify_session_token(session_token, db)
     if not user:
-        logger.warning("Token de sesión inválido o usuario no encontrado")
         return session_token_invalid_response()
 
-    # Verificar si la invitación existe
-    invitation = db.query(Invitation).filter(Invitation.invitation_id == invitation_id).first()
-    if not invitation:
-        raise HTTPException(status_code=404, detail="Invitación no encontrada")
-    
-    # Verificar si el usuario es el destinatario de la invitación
-    if invitation.email != user.email:
-        raise HTTPException(status_code=403, detail="No tienes permisos para aceptar o rechazar esta invitación")
+    # Consultar las notificaciones del usuario en la base de datos
+    notifications = db.query(Notification).filter(Notification.user_id == user.user_id).all()
 
-    # Actualizar el estado de la invitación dependiendo de la respuesta
-    if response.lower() == 'aceptar':
-        invitation.status = 'Aceptada'
-        
-        # Asignar al usuario en la tabla user_role_farm con el rol sugerido
-        new_user_role_farm = UserRoleFarm(
-            user_id=user.user_id,
-            farm_id=invitation.farm_id,
-            role_id=invitation.suggested_role
-        )
-        db.add(new_user_role_farm)
-    
-    elif response.lower() == 'rechazar':
-        invitation.status = 'Rechazada'
-    else:
-        raise HTTPException(status_code=400, detail="Respuesta inválida. Debe ser 'aceptar' o 'rechazar'.")
+    if not notifications:
+        return create_response("error", "No se encontraron notificaciones para este usuario.", data=[])
 
-    # Guardar cambios en la base de datos
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()  # Revertir cambios si ocurre un error
-        raise HTTPException(status_code=500, detail=f"Error al actualizar la invitación: {str(e)}")
-
-    return {
-        "message": f"Invitación {response.lower()} exitosamente",
-        "invitation_id": invitation.invitation_id,
-        "status": invitation.status
-    }
+    # Devolver la respuesta exitosa con las notificaciones encontradas
+    return create_response("success", "Notificaciones obtenidas exitosamente.", data=notifications)

@@ -1,8 +1,8 @@
-
-
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey,  CheckConstraint, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, CheckConstraint, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
+
 
 Base = declarative_base()
 
@@ -104,7 +104,6 @@ class Status(Base):
 
 
 # Definición del modelo User
-# Definición del modelo User
 class User(Base):
     __tablename__ = "users"
 
@@ -117,10 +116,11 @@ class User(Base):
     fcm_token = Column(String(255), nullable=True)  # Agregar el campo FCM token
     status_id = Column(Integer, ForeignKey("status.status_id"), nullable=False)
 
-    # Relación con Status
+    # Relaciones
     status = relationship("Status", back_populates="users")
     user_roles_farms = relationship('UserRoleFarm', back_populates='user') 
-    notifications = relationship("Notification", back_populates="user")
+    notifications = relationship("Notification", foreign_keys="[Notification.user_id]", back_populates="user")
+
 
 
 # Modelo para Permission
@@ -147,34 +147,52 @@ class RolePermission(Base):
     permission = relationship("Permission", back_populates="roles")
     
 # Modelo para Invitation (Invitación)
+# Modelo para Invitation (Invitación)
 class Invitation(Base):
     __tablename__ = 'invitation'
 
     invitation_id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String(150), nullable=False)
     suggested_role = Column(String(50), nullable=False)
-    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False, default=24)  # Cambiado de 'status' a 'status_id'
+    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False, default=24)
     farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)
+    inviter_user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)  # Nuevo campo para el invitador
+    date = Column(DateTime, default=datetime.utcnow, nullable=False)  # Fecha de creación
 
     # Relaciones
     farm = relationship("Farm", back_populates="invitations")
-    status = relationship("Status")  # Relación con la tabla 'Status'
+    status = relationship("Status")
+    inviter = relationship("User", foreign_keys=[inviter_user_id])  # Relación con el invitador
+    notifications = relationship("Notification", back_populates="invitation")
 
-    
 
+class NotificationType(Base):
+    __tablename__ = 'notification_type'
+
+    notification_type_id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False)
+
+    # Relaciones
+    notifications = relationship("Notification", back_populates="notification_type")
+
+# Modelo para Notification (Notificaciones)
 class Notification(Base):
     __tablename__ = 'notifications'
-    
+
     notifications_id = Column(Integer, primary_key=True, autoincrement=True)
     message = Column(String(255), nullable=True)
-    date = Column(DateTime, nullable=True)
-    is_read = Column(Boolean, nullable=True)
+    date = Column(DateTime, default=datetime.utcnow, nullable=False)
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    type = Column(String(50), nullable=False)
+    invitation_id = Column(Integer, ForeignKey('invitation.invitation_id'), nullable=True)
+    farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=True)
+    notification_type_id = Column(Integer, ForeignKey('notification_type.notification_type_id'), nullable=True)  # Agregar clave foránea
+    reminder_time = Column(DateTime, nullable=True)
+    is_responded = Column(Boolean, default=False)
 
-    # Check constraint for 'is_read' field
-    __table_args__ = (
-        CheckConstraint("is_read IN (true, false)", name="chk_is_read"),
-    )
+    # Relaciones
+    user = relationship("User", foreign_keys=[user_id], back_populates="notifications")
+    invitation = relationship("Invitation", back_populates="notifications")
+    farm = relationship("Farm")
+    notification_type = relationship("NotificationType", back_populates="notifications")  # Relación con NotificationType
 
-    # Relación con la tabla 'users'
-    user = relationship("User", back_populates="notifications")
