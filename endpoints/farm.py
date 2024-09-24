@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 from utils.email import send_email
 from utils.response import session_token_invalid_response
 from utils.response import create_response
+from utils.status import get_status
 
 
 # Configuración básica de logging
@@ -84,20 +85,11 @@ def create_farm(request: CreateFarmRequest, session_token: str, db: Session = De
         return create_response("error", "Unidad de medida no válida")
     
     # Obtener el StatusType con nombre "Farm"
-    status_type_record = db.query(StatusType).filter(StatusType.name == "Farm").first()
-    if not status_type_record:
-        logger.error("No se encontró el tipo de estado 'Farm'")
-        raise HTTPException(status_code=400, detail="No se encontró el tipo de estado 'Farm'.")
-
-    # Obtener el status_id para el estado "Activo" del tipo "Farm"
-    status_record = db.query(Status).filter(
-        Status.name == "Activo",
-        Status.status_type_id == status_type_record.status_type_id
-    ).first()
-
+    # Obtener el status "Activo" para el tipo "Farm" utilizando get_status
+    status_record = get_status(db, "Activo", "Farm")
     if not status_record:
         logger.error("No se encontró el estado 'Activo' para el tipo 'Farm'")
-        raise HTTPException(status_code=400, detail="No se encontró el estado 'Activo' para el tipo 'Farm'.")
+        return create_response("error", "No se encontró el estado 'Activo' para el tipo 'Farm'", status_code=400)
 
     try:
         # Crear la nueva finca

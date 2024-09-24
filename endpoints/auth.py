@@ -13,6 +13,7 @@ import secrets
 import datetime
 import logging
 from typing import Any, Dict
+from utils.status import get_status
 
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
@@ -113,20 +114,10 @@ def register_user(user: UserCreate, db: Session = Depends(get_db_session)):
         password_hash = hash_password(user.password)
         verification_token = generate_verification_token(4)
 
-        # Consulta para obtener el status_type_id del tipo "User"
-        status_type_record = db.query(StatusType).filter(StatusType.name == "User").first()
-
-        if not status_type_record:
-            raise HTTPException(status_code=400, detail="No se encontró el tipo de estado 'User'.")
-
-        # Consulta para obtener el status_id de "No Verificado"
-        status_record = db.query(Status).filter(
-            Status.name == "No Verificado",
-            Status.status_type_id == status_type_record.status_type_id
-        ).first()
-
+         # Usar get_status para obtener el estado "No Verificado" del tipo "User"
+        status_record = get_status(db, "No Verificado", "User")
         if not status_record:
-            raise HTTPException(status_code=400, detail="No se encontró el estado 'No Verificado' para tipo 'User'.")
+            return create_response("error", "No se encontró el estado 'No Verificado' para el tipo 'User'", status_code=400)
 
         # Crear el nuevo usuario con estado "No Verificado"
         new_user = User(
@@ -158,19 +149,10 @@ def verify_email(request: VerifyTokenRequest, db: Session = Depends(get_db_sessi
         return create_response("error", "Token inválido")
     
     try:
-        # Consulta para obtener el status_type_id del tipo "User"
-        status_type_record = db.query(StatusType).filter(StatusType.name == "User").first()
-        if not status_type_record:
-            raise HTTPException(status_code=400, detail="No se encontró el tipo de estado 'User'.")
-        
-        # Obtener el estado "Verificado"
-        status_verified = db.query(Status).filter(
-            Status.name == "Verificado",
-            Status.status_type_id == status_type_record.status_type_id
-        ).first()
-        
+        # Usar get_status para obtener el estado "Verificado" del tipo "User"
+        status_verified = get_status(db, "Verificado", "User")
         if not status_verified:
-            raise HTTPException(status_code=400, detail="No se encontró el estado 'Verificado'.")
+            return create_response("error", "No se encontró el estado 'Verificado' para el tipo 'User'", status_code=400)
 
         # Actualizar el usuario: marcar como verificado y cambiar el status_id
         user.verification_token = None
@@ -336,9 +318,10 @@ def login(request: LoginRequest, db: Session = Depends(get_db_session)):
     if not user or not verify_password(request.password, user.password_hash):
         return create_response("error", "Credenciales incorrectas")
 
-    # Verificar si el usuario está en estado "Verificado"
-    status_verified = db.query(Status).filter(Status.name == "Verificado").first()
-    if user.status_id != status_verified.status_id:
+    # Usar get_status para verificar si el usuario está en estado "Verificado"
+    status_verified = get_status(db, "Verificado", "User")
+    if not status_verified or user.status_id != status_verified.status_id:
+        
         # Usuario no verificado, generar un nuevo token de verificación
         new_verification_token = generate_verification_token(4)
         user.verification_token = new_verification_token

@@ -32,7 +32,7 @@ class UserRoleFarm(Base):
     role_id = Column(Integer, ForeignKey('role.role_id'), nullable=False)
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
     farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)
-    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False, default=24)  # Nuevo campo status_id
+    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False, default=22)  # Nuevo campo status_id
 
     # Relaciones
     user = relationship('User', back_populates='user_roles_farms')
@@ -166,14 +166,16 @@ class Invitation(Base):
     notifications = relationship("Notification", back_populates="invitation")
 
 
+# Modelo para NotificationType (Tipos de notificaciones)
 class NotificationType(Base):
     __tablename__ = 'notification_type'
 
     notification_type_id = Column(Integer, primary_key=True)
     name = Column(String(50), nullable=False)
 
-    # Relaciones
+    # Relación con Notification
     notifications = relationship("Notification", back_populates="notification_type")
+    
 
 # Modelo para Notification (Notificaciones)
 class Notification(Base):
@@ -183,16 +185,15 @@ class Notification(Base):
     message = Column(String(255), nullable=True)
     date = Column(DateTime, default=datetime.utcnow, nullable=False)
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
-    type = Column(String(50), nullable=False)
     invitation_id = Column(Integer, ForeignKey('invitation.invitation_id'), nullable=True)
     farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=True)
-    notification_type_id = Column(Integer, ForeignKey('notification_type.notification_type_id'), nullable=True)  # Agregar clave foránea
+    notification_type_id = Column(Integer, ForeignKey('notification_type.notification_type_id'), nullable=True)  # Nueva clave foránea
     reminder_time = Column(DateTime, nullable=True)
-    is_responded = Column(Boolean, default=False)
+    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=True)  # Nueva clave foránea
 
     # Relaciones
     user = relationship("User", foreign_keys=[user_id], back_populates="notifications")
     invitation = relationship("Invitation", back_populates="notifications")
     farm = relationship("Farm")
     notification_type = relationship("NotificationType", back_populates="notifications")  # Relación con NotificationType
-
+    status = relationship("Status")  # Relación con Status

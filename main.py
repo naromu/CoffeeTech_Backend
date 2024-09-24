@@ -4,6 +4,7 @@ from endpoints import utils
 from endpoints import farm 
 from endpoints import invitation
 from endpoints import notification 
+from endpoints import collaborators
 
 from dataBase import engine
 from models.models import Base
@@ -24,6 +25,9 @@ app.include_router(farm.router, prefix="/farm", tags=["Fincas"])
 app.include_router(invitation.router, prefix="/invitation", tags=["Invitaciones"])
 
 app.include_router(notification.router, prefix="/notification", tags=["Notificaciones"])
+
+app.include_router(collaborators.router, prefix="/collaborators", tags=["Collaborators"])
+
 
 
 # Incluir las rutas de farm con prefijo y etiqueta
