@@ -310,3 +310,70 @@ def get_farm(farm_id: int, session_token: str, db: Session = Depends(get_db_sess
         logger.error("Error al obtener la finca: %s", str(e))
         return create_response("error", "Ocurrió un error al intentar obtener la finca. Por favor, inténtalo de nuevo más tarde.")   
 
+@router.post("/delete-farm/{farm_id}")
+def delete_farm(farm_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    # Verificar el token de sesión
+    user = verify_session_token(session_token, db)
+    if not user:
+        logger.warning("Token de sesión inválido o usuario no encontrado")
+        return create_response("error", "Token de sesión inválido o usuario no encontrado")
+
+    # Verificar si el usuario está asociado con la finca
+    user_role_farm = db.query(UserRoleFarm).filter(
+        UserRoleFarm.farm_id == farm_id,
+        UserRoleFarm.user_id == user.user_id
+    ).first()
+
+    if not user_role_farm:
+        logger.warning("El usuario no está asociado con la finca que intenta eliminar")
+        return create_response("error", "No tienes permiso para eliminar esta finca")
+
+    # Verificar permisos para eliminar la finca
+    role_permission = db.query(RolePermission).join(Permission).filter(
+        RolePermission.role_id == user_role_farm.role_id,
+        Permission.name == "delete_farm"
+    ).first()
+
+    if not role_permission:
+        logger.warning("El rol del usuario no tiene permiso para eliminar la finca")
+        return create_response("error", "No tienes permiso para eliminar esta finca")
+
+    try:
+        # Verificar si la finca tiene lotes o colaboradores asociados
+        has_plots = db.query(Plot).filter(Plot.farm_id == farm_id).count() > 0
+        has_collaborators = db.query(UserRoleFarm).filter(
+            UserRoleFarm.farm_id == farm_id,
+            UserRoleFarm.user_id != user.user_id  # Excluir al propietario
+        ).count() > 0
+
+        farm = db.query(Farm).filter(Farm.farm_id == farm_id).first()
+
+        if not farm:
+            logger.warning("Finca no encontrada")
+            return create_response("error", "Finca no encontrada")
+
+        if has_plots or has_collaborators:
+            # Cambiar el estado de la finca a "Inactiva"
+            inactive_status = db.query(Status).join(StatusType).filter(
+                Status.name == "Inactiva",
+                StatusType.name == "Farm"
+            ).first()
+
+            if not inactive_status:
+                logger.error("No se encontró el estado 'Inactiva' para el tipo 'Farm'")
+                raise HTTPException(status_code=400, detail="No se encontró el estado 'Inactiva' para el tipo 'Farm'.")
+
+            farm.status_id = inactive_status.status_id
+            db.commit()
+            logger.info("Finca con ID %s puesta en estado 'Inactiva'", farm_id)
+            return create_response("success", "Finca puesta en estado 'Inactiva' correctamente")
+
+        # Si no tiene dependencias, eliminar la finca
+        db.delete(farm)
+        db.commit()
+        logger.info("Finca eliminada con éxito")
+        return create_response("success", "Finca eliminada correctamente")
+    except Exception as e:
+        db.rollback()
+        logger.error("Error al eliminar o desactivar la finca: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"Error al eliminar o desactivar la finca: {str(e)}")

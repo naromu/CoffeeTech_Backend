@@ -3,6 +3,7 @@ from endpoints import auth
 from endpoints import utils
 from endpoints import farm 
 from endpoints import invitation
+from endpoints import plots
 from endpoints import notification 
 from endpoints import collaborators
 
@@ -23,6 +24,8 @@ app.include_router(utils.router, prefix="/utils", tags=["Utilidades"])
 app.include_router(farm.router, prefix="/farm", tags=["Fincas"])
 
 app.include_router(invitation.router, prefix="/invitation", tags=["Invitaciones"])
+
+app.include_router(plots.router, prefix="/plots", tags=["Lotes"])
 
 app.include_router(notification.router, prefix="/notification", tags=["Notificaciones"])
 

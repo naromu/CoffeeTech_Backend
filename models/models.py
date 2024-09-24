@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, CheckConstraint, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, CheckConstraint, DateTime, Boolean, Date
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -21,6 +21,7 @@ class Farm(Base):
     status = relationship("Status")
     invitations = relationship("Invitation", back_populates="farm")
     user_roles_farms = relationship('UserRoleFarm', back_populates='farm')
+    plots = relationship("Plot", back_populates="farm")
 
 
     
@@ -32,6 +33,7 @@ class UserRoleFarm(Base):
     role_id = Column(Integer, ForeignKey('role.role_id'), nullable=False)
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
     farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)
+    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False, default=22)  # Nuevo campo status_id
     status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False, default=22)  # Nuevo campo status_id
 
     # Relaciones
@@ -196,4 +198,41 @@ class Notification(Base):
     invitation = relationship("Invitation", back_populates="notifications")
     farm = relationship("Farm")
     notification_type = relationship("NotificationType", back_populates="notifications")  # Relación con NotificationType
-    status = relationship("Status")  # Relación con Status
+
+class Plot(Base):
+    __tablename__ = 'plot'
+
+    plot_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    seed_time = Column(Date, nullable=True)
+    longitude = Column(String(45), nullable=True)
+    latitude = Column(String(45), nullable=True)
+    altitude = Column(String(45), nullable=True)
+    coffee_variety_id = Column(Integer, ForeignKey('coffee_variety.coffee_variety_id'), nullable=False)
+    farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)
+
+    # Relaciones
+    plot_phases = relationship('PlotPhase', back_populates='plot')
+    farm = relationship("Farm", back_populates="plots")
+    
+class Phase(Base):
+    __tablename__ = 'phase'
+
+    phase_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), nullable=False)
+    date = Column(Date, nullable=True)
+
+    # Relaciones
+    plot_phases = relationship('PlotPhase', back_populates='phase')
+    
+class PlotPhase(Base):
+    __tablename__ = 'plot_phases'
+
+    plot_phase_id = Column(Integer, primary_key=True, index=True)
+    phase_id = Column(Integer, ForeignKey('phase.phase_id'), nullable=False)
+    plot_id = Column(Integer, ForeignKey('plot.plot_id'), nullable=False)
+
+    # Relaciones
+    phase = relationship('Phase', back_populates='plot_phases')
+    plot = relationship('Plot', back_populates='plot_phases')
+
