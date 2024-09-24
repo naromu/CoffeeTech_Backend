@@ -171,7 +171,7 @@ class EditCollaboratorRoleRequest(BaseModel):
 
     def validate_input(self):
         if self.new_role not in ["Administrador de finca", "Operador de campo"]:
-            raise ValueError("El `new_role` debe ser 'Administrador de finca' o 'Operador de campo'.")
+            raise ValueError("El rol debe ser 'Administrador de finca' o 'Operador de campo'.")
 
 @router.post("/edit-collaborator-role", response_model=Dict[str, Any])
 def edit_collaborator_role(
@@ -442,11 +442,7 @@ from utils.response import create_response, session_token_invalid_response
 from sqlalchemy import func
 import logging
 
-# Configuración básica de logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-router = APIRouter()
 
 # Modelo Pydantic para la solicitud de eliminación de colaborador
 class DeleteCollaboratorRequest(BaseModel):
