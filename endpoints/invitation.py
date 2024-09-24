@@ -208,9 +208,10 @@ def respond_invitation(invitation_id: int, action: str, session_token: str, db: 
     # Usar get_status para obtener los estados "Aceptada" y "Rechazada" del tipo "Invitation"
     accepted_status = get_status(db, "Aceptada", "Invitation")
     rejected_status = get_status(db, "Rechazada", "Invitation")
+    responded_status = get_status(db, "Respondida", "Notification")  # Obtener el estado "Respondida"
 
-    if not accepted_status or not rejected_status:
-        return create_response("error", "Estados 'Aceptada' o 'Rechazada' no encontrados en la base de datos", status_code=500)
+    if not accepted_status or not rejected_status or not responded_status:
+        return create_response("error", "Estados necesarios no encontrados en la base de datos", status_code=500)
 
     # Verificar si la invitación ya fue aceptada o rechazada
     if invitation.status_id in [accepted_status.status_id, rejected_status.status_id]:
@@ -219,7 +220,7 @@ def respond_invitation(invitation_id: int, action: str, session_token: str, db: 
     # Actualizar las notificaciones relacionadas con la invitación
     notification = db.query(Notification).filter(Notification.invitation_id == invitation_id).first()
     if notification:
-        notification.is_responded = True  # Marcar la notificación como respondida
+        notification.status_id = responded_status.status_id  # Actualizar el estado a "Respondida"
         db.commit()
 
     # Verificar si la acción es "accept" o "reject"
@@ -228,17 +229,22 @@ def respond_invitation(invitation_id: int, action: str, session_token: str, db: 
         invitation.status_id = accepted_status.status_id
         db.commit()
 
-        # Usar la función get_status para obtener el estado "Activo" del tipo "Farm"
+        # Usar la función get_status para obtener el estado "Activo" del tipo "user_role_farm"
         active_status = get_status(db, "Activo", "user_role_farm")
         if not active_status:
-            return create_response("error", "El estado 'Activo' no fue encontrado para 'Farm'", status_code=400)
+            return create_response("error", "El estado 'Activo' no fue encontrado para 'user_role_farm'", status_code=400)
 
-        # Agregar al usuario a la finca en la tabla user_role_farm con el rol de la invitación
+        # Obtener el rol sugerido
+        suggested_role = db.query(Role).filter(Role.name == invitation.suggested_role).first()
+        if not suggested_role:
+            return create_response("error", "El rol sugerido no es válido", status_code=400)
+
+        # Agregar al usuario a la finca en la tabla UserRoleFarm con el rol de la invitación
         new_user_role_farm = UserRoleFarm(
             user_id=user.user_id,
             farm_id=invitation.farm_id,
-            role_id=db.query(Role).filter(Role.name == invitation.suggested_role).first().role_id,  # Asignar el rol sugerido
-            status_id=active_status.status_id  # Estado "Activo" del tipo "Farm"
+            role_id=suggested_role.role_id,  # Asignar el rol sugerido
+            status_id=active_status.status_id  # Estado "Activo" del tipo "user_role_farm"
         )
         db.add(new_user_role_farm)
         db.commit()
@@ -246,10 +252,6 @@ def respond_invitation(invitation_id: int, action: str, session_token: str, db: 
         # Crear la notificación para el usuario que hizo la invitación (inviter_user_id)
         inviter = db.query(User).filter(User.user_id == invitation.inviter_user_id).first()
         if inviter:
-            responded_status = get_status(db, "Respondida", "Notification")
-            if not responded_status:
-                return create_response("error", "El estado 'Respondida' no fue encontrado para 'Notification'", status_code=400)
-
             accepted_notification_type = db.query(NotificationType).filter(NotificationType.name == "Invitation_accepted").first()
             if not accepted_notification_type:
                 return create_response("error", "No se encontró el tipo de notificación 'Invitation_accepted'", status_code=400)
@@ -281,10 +283,6 @@ def respond_invitation(invitation_id: int, action: str, session_token: str, db: 
         # Crear la notificación para el usuario que hizo la invitación (inviter_user_id)
         inviter = db.query(User).filter(User.user_id == invitation.inviter_user_id).first()
         if inviter:
-            responded_status = get_status(db, "Respondida", "Notification")
-            if not responded_status:
-                return create_response("error", "El estado 'Respondida' no fue encontrado para 'Notification'", status_code=400)
-
             rejected_notification_type = db.query(NotificationType).filter(NotificationType.name == "invitation_rejected").first()
             if not rejected_notification_type:
                 return create_response("error", "No se encontró el tipo de notificación 'invitation_rejected'", status_code=400)

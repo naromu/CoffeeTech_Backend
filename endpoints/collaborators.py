@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from models.models import (
     Farm,
     UserRoleFarm,
@@ -18,6 +18,7 @@ from utils.response import create_response, session_token_invalid_response
 from sqlalchemy import func
 import logging
 
+
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,6 +34,31 @@ class Collaborator(BaseModel):
 
     class Config:
         from_attributes = True
+        
+# Modelo Pydantic para la solicitud de edición de rol
+class EditCollaboratorRoleRequest(BaseModel):
+    collaborator_user_id: int = Field(..., alias="collaborator_user_id")
+    new_role: str
+
+    class Config:
+        populate_by_name = True  # Reemplaza 'allow_population_by_field_name = True'
+        from_attributes = True    # Reemplaza 'orm_mode = True'
+
+    def validate_input(self):
+        if self.new_role not in ["Administrador de finca", "Operador de campo"]:
+            raise ValueError("El rol debe ser 'Administrador de finca' o 'Operador de campo'.")
+        
+# Modelo Pydantic para la solicitud de eliminación de colaborador
+class DeleteCollaboratorRequest(BaseModel):
+    collaborator_user_id: int = Field(..., alias="collaborator_user_id")
+
+    class Config:
+        populate_by_name = True
+        from_attributes = True
+
+    def validate_input(self):
+        if self.collaborator_user_id <= 0:
+            raise ValueError("El `collaborator_user_id` debe ser un entero positivo.")
 
 @router.get("/list-collaborators", response_model=Dict[str, Any])
 def list_collaborators(
@@ -140,38 +166,8 @@ def list_collaborators(
     )
 
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import Dict, Any
-from pydantic import BaseModel, EmailStr, Field
-from models.models import (
-    Farm,
-    UserRoleFarm,
-    User,
-    RolePermission,
-    Permission,
-    Status,
-    StatusType,
-    Role
-)
-from utils.security import verify_session_token
-from dataBase import get_db_session
-from utils.response import create_response, session_token_invalid_response
-from sqlalchemy import func
-import logging
 
-# Modelo Pydantic para la solicitud de edición de rol
-class EditCollaboratorRoleRequest(BaseModel):
-    collaborator_user_id: int = Field(..., alias="collaborator_user_id")
-    new_role: str
 
-    class Config:
-        populate_by_name = True  # Reemplaza 'allow_population_by_field_name = True'
-        from_attributes = True    # Reemplaza 'orm_mode = True'
-
-    def validate_input(self):
-        if self.new_role not in ["Administrador de finca", "Operador de campo"]:
-            raise ValueError("El rol debe ser 'Administrador de finca' o 'Operador de campo'.")
 
 @router.post("/edit-collaborator-role", response_model=Dict[str, Any])
 def edit_collaborator_role(
@@ -422,39 +418,7 @@ def edit_collaborator_role(
         status_code=200
     )
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import Dict, Any
-from pydantic import BaseModel, Field
-from models.models import (
-    Farm,
-    UserRoleFarm,
-    User,
-    RolePermission,
-    Permission,
-    Status,
-    StatusType,
-    Role
-)
-from utils.security import verify_session_token
-from dataBase import get_db_session
-from utils.response import create_response, session_token_invalid_response
-from sqlalchemy import func
-import logging
 
-
-
-# Modelo Pydantic para la solicitud de eliminación de colaborador
-class DeleteCollaboratorRequest(BaseModel):
-    collaborator_user_id: int = Field(..., alias="collaborator_user_id")
-
-    class Config:
-        populate_by_name = True
-        from_attributes = True
-
-    def validate_input(self):
-        if self.collaborator_user_id <= 0:
-            raise ValueError("El `collaborator_user_id` debe ser un entero positivo.")
 
 @router.post("/delete-collaborator", response_model=Dict[str, Any])
 def delete_collaborator(
