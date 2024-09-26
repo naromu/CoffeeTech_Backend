@@ -19,6 +19,8 @@ from sqlalchemy import func
 import logging
 
 
+
+
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

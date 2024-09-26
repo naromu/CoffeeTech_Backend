@@ -2,7 +2,10 @@ from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, CheckConstr
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
+from sqlalchemy.orm import registry
 
+mapper_registry = registry()
+mapper_registry.configure()
 
 Base = declarative_base()
 
@@ -202,7 +205,7 @@ class Notification(Base):
 class Plot(Base):
     __tablename__ = 'plot'
 
-    plot_id = Column(Integer, primary_key=True, index=True)
+    plot_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     seed_time = Column(Date, nullable=True)
     longitude = Column(String(45), nullable=True)
@@ -214,6 +217,9 @@ class Plot(Base):
     # Relaciones
     plot_phases = relationship('PlotPhase', back_populates='plot')
     farm = relationship("Farm", back_populates="plots")
+    
+    coffee_variety = relationship("CoffeeVariety", back_populates="plots")
+
     
 class Phase(Base):
     __tablename__ = 'phase'
@@ -236,3 +242,14 @@ class PlotPhase(Base):
     phase = relationship('Phase', back_populates='plot_phases')
     plot = relationship('Plot', back_populates='plot_phases')
 
+class CoffeeVariety(Base):
+    __tablename__ = 'coffee_variety'
+    
+    coffee_variety_id = Column(Integer, primary_key=True, index=True, nullable=False)
+    name = Column(String(50), nullable=False)
+
+    def __repr__(self):
+        return f"<CoffeeVariety(coffee_variety_id={self.coffee_variety_id}, name={self.name})>"
+    
+    plots = relationship("Plot", back_populates="coffee_variety")
+    

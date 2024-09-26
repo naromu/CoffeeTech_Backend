@@ -9,6 +9,7 @@ from decimal import Decimal
 def create_response(
     status: str,
     message: str,
+    plot_id: Optional[int] = None,
     data: Optional[Any] = None,  # Permitir cualquier tipo de datos
     status_code: int = 200
 ) -> JSONResponse:
@@ -33,6 +34,7 @@ def create_response(
             "message": message,
             "data": data or {}
         }
+        
     )
 
 
