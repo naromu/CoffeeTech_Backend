@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, CheckConstraint, DateTime, Boolean, Date
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, CheckConstraint, DateTime, Boolean, Date, DECIMAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -247,9 +247,29 @@ class CoffeeVariety(Base):
     
     coffee_variety_id = Column(Integer, primary_key=True, index=True, nullable=False)
     name = Column(String(50), nullable=False)
+    description = Column(String(255), default=None)
+    rust_resistant = Column(Boolean, nullable=False)
+    growth_habit = Column(String(50), nullable=False)
+    plant_density_sun = Column(DECIMAL(10, 2), default=None)
+    plant_density_shade = Column(DECIMAL(10, 2), default=None)
+    production = Column(DECIMAL(10, 2), default=None)
+    altitude_min = Column(Integer, default=None)
+    altitude_max = Column(Integer, default=None)
+    plant_density_unit_id = Column(Integer, ForeignKey('unit_of_measure.unit_of_measure_id'), nullable=False)
+    production_unit_id = Column(Integer, ForeignKey('unit_of_measure.unit_of_measure_id'), nullable=False)
+    altitude_unit_id = Column(Integer, ForeignKey('unit_of_measure.unit_of_measure_id'), nullable=False)
+
+    # Relaciones
+    plots = relationship("Plot", back_populates="coffee_variety")
 
     def __repr__(self):
-        return f"<CoffeeVariety(coffee_variety_id={self.coffee_variety_id}, name={self.name})>"
-    
-    plots = relationship("Plot", back_populates="coffee_variety")
-    
+        return (f"<CoffeeVariety(coffee_variety_id={self.coffee_variety_id}, "
+                f"name={self.name}, description={self.description}, "
+                f"rust_resistant={self.rust_resistant}, growth_habit={self.growth_habit}, "
+                f"plant_density_sun={self.plant_density_sun}, "
+                f"plant_density_shade={self.plant_density_shade}, "
+                f"production={self.production}, altitude_min={self.altitude_min}, "
+                f"altitude_max={self.altitude_max}, "
+                f"plant_density_unit_id={self.plant_density_unit_id}, "
+                f"production_unit_id={self.production_unit_id}, "
+                f"altitude_unit_id={self.altitude_unit_id})>")
