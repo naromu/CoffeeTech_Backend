@@ -101,6 +101,10 @@ class Status(Base):
 
     # Relación con User
     users = relationship("User", back_populates="status")
+    
+    # Relación con Notification
+    notifications = relationship("Notification", back_populates="status")
+
 
 
 # Definición del modelo User
@@ -185,9 +189,9 @@ class Notification(Base):
     date = Column(DateTime, default=datetime.utcnow, nullable=False)
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
     invitation_id = Column(Integer, ForeignKey('invitation.invitation_id'), nullable=True)
-    farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=True)
     notification_type_id = Column(Integer, ForeignKey('notification_type.notification_type_id'), nullable=True)
     reminder_time = Column(DateTime, nullable=True)
+    farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=True)
     status_id = Column(Integer, ForeignKey('status.status_id'), nullable=True)
 
     # Relaciones
@@ -195,6 +199,10 @@ class Notification(Base):
     invitation = relationship("Invitation", back_populates="notifications")
     farm = relationship("Farm")
     notification_type = relationship("NotificationType", back_populates="notifications")
+    
+    # Agregar la relación con Status
+    status = relationship("Status", back_populates="notifications")
+
 
 
 # Modelo para Plot

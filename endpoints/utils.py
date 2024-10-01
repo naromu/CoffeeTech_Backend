@@ -79,14 +79,7 @@ def list_coffee_varieties(db: Session = Depends(get_db_session)):
         "data": [
             {
                 "coffee_variety_id": variety.coffee_variety_id,
-                "name": variety.name,
-                "plots": [
-                    {
-                        "plot_id": plot.plot_id,
-                        "name": plot.name
-                        
-                    } for plot in variety.plots
-                ]
+                "name": variety.name
             } for variety in varieties
         ]
     }
