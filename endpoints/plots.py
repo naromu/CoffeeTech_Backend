@@ -131,7 +131,7 @@ def create_plot(plot_data: PlotCreate, session_token: str, db: Session = Depends
         db.add(new_plot)
         db.commit()
         logger.info("Lote creado con éxito")
-        return create_response("success", "Lote creado correctamente", plot_id=new_plot.plot_id, status_code=201)
+        return create_response("success", "Lote creado correctamente", status_code=201)
 
 
     except SQLAlchemyError as e:
