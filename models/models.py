@@ -273,3 +273,19 @@ class CoffeeVariety(Base):
                 f"plant_density_unit_id={self.plant_density_unit_id}, "
                 f"production_unit_id={self.production_unit_id}, "
                 f"altitude_unit_id={self.altitude_unit_id})>")
+        
+class Flowering(Base):
+    __tablename__ = 'flowering'
+
+    flowering_id = Column(Integer, primary_key=True, index=True, autoincrement=True, nullable=False)
+    plot_id = Column(Integer, ForeignKey('plot.plot_id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    flowering_date = Column(Date, nullable=False)
+    harvest_date = Column(Date, nullable=True, default=None)
+    status_id = Column(Integer, ForeignKey('status.status_id', ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+
+    # Relaciones
+    plot = relationship("Plot", back_populates="flowerings")
+    status = relationship("Status", back_populates="flowerings")
+
+    def __repr__(self):
+        return f"<Flowering(flowering_id={self.flowering_id}, plot_id={self.plot_id}, flowering_date={self.flowering_date}, harvest_date={self.harvest_date}, status_id={self.status_id})>"

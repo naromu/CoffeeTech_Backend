@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from models.models import Plot, UserRoleFarm, Permission, RolePermission, Farm, Status, StatusType, CoffeeVariety, UnitOfMeasure, Role
+from models.models import Plot, UserRoleFarm, Permission, RolePermission, Farm, Status, StatusType, CoffeeVariety, UnitOfMeasure, Role, Flowering
 from utils.security import verify_session_token
 from utils.status import get_status
 from dataBase import get_db_session
@@ -64,6 +64,32 @@ class PlotResponse(BaseModel):
 
 class PlotDelete(BaseModel):
     plot_id: int
+
+    class Config:
+        orm_mode = True
+        
+class FloweringCreate(BaseModel):
+    plot_id: int
+    flowering_date: date
+    harvest_date: Optional[date] = None
+    status_name: Optional[str] = None  # Será opcional para aplicar la lógica de estado
+
+    class Config:
+        orm_mode = True
+        
+class FloweringResponse(BaseModel):
+    flowering_id: int
+    plot_id: int
+    flowering_date: date
+    harvest_date: Optional[date]
+    status_name: str
+
+    class Config:
+        orm_mode = True
+        
+class FloweringUpdate(BaseModel):
+    flowering_date: Optional[date]
+    harvest_date: Optional[date]
 
     class Config:
         orm_mode = True
@@ -442,4 +468,165 @@ def get_plot(plot_id: int, session_token: str, db: Session = Depends(get_db_sess
         # Log detallado para administradores, pero respuesta genérica para el usuario
         logger.error("Error al obtener el lote: %s", str(e))
         return create_response("error", "Ocurrió un error al intentar obtener el lote. Por favor, inténtalo de nuevo más tarde.")
+    
 
+@router.post("/add-flowering", response_model=FloweringResponse)
+def add_flowering(
+    flowering_data: FloweringCreate,  # Usamos FloweringCreate para recibir los datos
+    session_token: str, 
+    db: Session = Depends(get_db_session)
+):
+    # Verificación de sesión y usuario
+    user = verify_session_token(session_token, db)
+    if not user:
+        return session_token_invalid_response()
+
+    logger.info(f"Usuario autenticado: {user.name} (ID: {user.user_id})")
+
+    # Verificar permisos del usuario sobre el lote
+    plot = db.query(Plot).filter(Plot.plot_id == flowering_data.plot_id).first()
+    if not plot:
+        logger.error(f"Lote con ID {flowering_data.plot_id} no encontrado")
+        return create_response("error", "Lote no encontrado", status_code=404)
+
+    farm = db.query(Farm).filter(Farm.farm_id == plot.farm_id).first()
+
+    active_status = db.query(Status).join(StatusType).filter(
+        Status.name == "Activo",
+        StatusType.name == "user_role_farm"
+    ).first()
+
+    if not active_status:
+        logger.error("Estado 'Activo' no encontrado para 'user_role_farm'")
+        return create_response("error", "Estado 'Activo' no encontrado para 'user_role_farm'", status_code=400)
+
+    user_role_farm = db.query(UserRoleFarm).filter(
+        UserRoleFarm.farm_id == farm.farm_id,
+        UserRoleFarm.user_id == user.user_id
+    ).first()
+
+    if not user_role_farm:
+        logger.warning("El usuario no está asociado con la finca")
+        raise HTTPException(status_code=403, detail="No tienes permiso para agregar floraciones en esta finca")
+
+    role_permission = db.query(RolePermission).join(Permission).filter(
+        RolePermission.role_id == user_role_farm.role_id,
+        Permission.name == "add-flowering"
+    ).first()
+
+    if not role_permission:
+        logger.warning("El rol del usuario no tiene permiso para agregar floraciones")
+        raise HTTPException(status_code=403, detail="No tienes permiso para agregar floraciones en esta finca")
+
+    # Determinar el status_name basado en si hay harvest_date o no
+    if flowering_data.harvest_date:
+        status_name = "cosechada"
+    else:
+        status_name = "activa"
+
+    # Si se envió un status_name en el request, se respeta el valor proporcionado
+    if flowering_data.status_name:
+        status_name = flowering_data.status_name
+
+    # Buscar el status_id basado en el status_name
+    status = db.query(Status).filter(Status.name == status_name).first()
+    if not status:
+        logger.error(f"Estado '{status_name}' no encontrado")
+        raise HTTPException(status_code=404, detail=f"Estado '{status_name}' no encontrado")
+
+    # Crear la nueva floración
+    try:
+        new_flowering = Flowering(
+            plot_id=flowering_data.plot_id,
+            flowering_date=flowering_data.flowering_date,
+            harvest_date=flowering_data.harvest_date,
+            status_id=status.status_id
+        )
+        db.add(new_flowering)
+        db.commit()
+        db.refresh(new_flowering)
+        logger.info(f"Floración añadida exitosamente para el lote {new_flowering.plot_id}")
+        return create_response("success", "Floración añadida correctamente", flowering_id=new_flowering.flowering_id, status_code=200)
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error al agregar floración: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al agregar floración: {str(e)}")
+
+@router.put("/edit-flowering/{flowering_id}", response_model=FloweringResponse)
+def edit_flowering(
+    flowering_id: int,
+    flowering_data: FloweringUpdate,  # Usamos FloweringUpdate para recibir los datos de actualización
+    session_token: str,
+    db: Session = Depends(get_db_session)
+):
+    # Verificación de sesión y usuario
+    user = verify_session_token(session_token, db)
+    if not user:
+        return session_token_invalid_response()
+
+    logger.info(f"Usuario autenticado: {user.name} (ID: {user.user_id})")
+
+    # Buscar la floración a editar
+    flowering = db.query(Flowering).filter(Flowering.flowering_id == flowering_id).first()
+    if not flowering:
+        logger.error(f"Floración con ID {flowering_id} no encontrada")
+        return create_response("error", "Floración no encontrada", status_code=404)
+
+    # Verificar permisos del usuario sobre el lote asociado a la floración
+    plot = db.query(Plot).filter(Plot.plot_id == flowering.plot_id).first()
+    if not plot:
+        logger.error(f"Lote con ID {flowering.plot_id} no encontrado")
+        return create_response("error", "Lote no encontrado", status_code=404)
+
+    farm = db.query(Farm).filter(Farm.farm_id == plot.farm_id).first()
+
+    user_role_farm = db.query(UserRoleFarm).filter(
+        UserRoleFarm.farm_id == farm.farm_id,
+        UserRoleFarm.user_id == user.user_id
+    ).first()
+
+    if not user_role_farm:
+        logger.warning("El usuario no está asociado con la finca")
+        raise HTTPException(status_code=403, detail="No tienes permiso para editar floraciones en esta finca")
+
+    # Permitir editar la floración si el usuario tiene permisos sobre el lote
+    role_permission = db.query(RolePermission).join(Permission).filter(
+        RolePermission.role_id == user_role_farm.role_id,
+        Permission.name == "edit-flowering"  # o el permiso adecuado para editar
+    ).first()
+
+    if not role_permission:
+        logger.warning("El rol del usuario no tiene permiso para editar floraciones")
+        raise HTTPException(status_code=403, detail="No tienes permiso para editar floraciones en esta finca")
+
+    # Actualización de campos de floración
+    try:
+        if flowering_data.flowering_date is not None:
+            flowering.flowering_date = flowering_data.flowering_date
+
+        if flowering_data.harvest_date is not None:
+            flowering.harvest_date = flowering_data.harvest_date
+
+            # Cambiar el estado a "cosechada" si se proporciona la fecha de cosecha
+            status = db.query(Status).filter(Status.name == "cosechada").first()
+        else:
+            # Cambiar el estado a "activa" si no se proporciona fecha de cosecha
+            status = db.query(Status).filter(Status.name == "activa").first()
+
+        if not status:
+            logger.error(f"Estado correspondiente no encontrado")
+            return create_response("error", f"Estado no encontrado", status_code=404)
+
+        flowering.status_id = status.status_id
+
+        # Guardar cambios en la base de datos
+        db.commit()
+        db.refresh(flowering)
+        logger.info(f"Floración {flowering.flowering_id} editada con éxito")
+        return create_response("success", "Floración editada correctamente", flowering_id=flowering.flowering_id, status_code=200)
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error al editar floración: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al editar floración: {str(e)}")
