@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from models.models import Role, UnitOfMeasure
+from models.models import Role, UnitOfMeasure, CoffeeVariety
 from dataBase import get_db_session
+from sqlalchemy.orm import joinedload
 
 router = APIRouter()
 
@@ -63,5 +64,29 @@ def list_unit_measures(db: Session = Depends(get_db_session)):
                     "name": uom.unit_of_measure_type.name
                 }
             } for uom in units_of_measure
+        ]
+    }
+    
+@router.get("/list-coffee-varieties")
+def list_coffee_varieties(db: Session = Depends(get_db_session)):
+    # Consulta todas las variedades de café y carga las parcelas asociadas usando `joinedload`
+    varieties = db.query(CoffeeVariety).options(joinedload(CoffeeVariety.plots)).all()
+
+    # Construir la respuesta con las variedades y sus parcelas asociadas
+    return {
+        "status": "success",
+        "message": "Variedades de café obtenidas correctamente",
+        "data": [
+            {
+                "coffee_variety_id": variety.coffee_variety_id,
+                "name": variety.name,
+                "plots": [
+                    {
+                        "plot_id": plot.plot_id,
+                        "name": plot.name
+                        
+                    } for plot in variety.plots
+                ]
+            } for variety in varieties
         ]
     }
