@@ -28,7 +28,7 @@ class NotificationResponse(BaseModel):
     status: Optional[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }

@@ -6,6 +6,9 @@ __pycache__/
 # .gitignore
 venv/
 
+coffeeTechEntorno/
+backend/
+
 
 coffeeTechEntorno/
 backend/
