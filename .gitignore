@@ -6,5 +6,8 @@ __pycache__/
 # .gitignore
 venv/
 
+coffeeTechEntorno/
+backend/
+
 
 coffeetech-c5cb7-7edbb325ca73.json

@@ -3,9 +3,10 @@ from endpoints import auth
 from endpoints import utils
 from endpoints import farm 
 from endpoints import invitation
-from endpoints import plots
 from endpoints import notification 
 from endpoints import collaborators
+from endpoints import plots
+from endpoints import flowering
 
 from dataBase import engine
 from models.models import Base
@@ -25,7 +26,11 @@ app.include_router(farm.router, prefix="/farm", tags=["Fincas"])
 
 app.include_router(invitation.router, prefix="/invitation", tags=["Invitaciones"])
 
+
 app.include_router(plots.router, prefix="/plots", tags=["Lotes"])
+
+app.include_router(flowering.router, prefix="/flowering", tags=["Floraciones"])
+
 
 app.include_router(notification.router, prefix="/notification", tags=["Notificaciones"])
 

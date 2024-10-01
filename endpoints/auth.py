@@ -311,6 +311,14 @@ def reset_password(reset: PasswordReset, db: Session = Depends(get_db_session)):
         return create_response("error", "Token inválido o expirado")
 
 
+import logging
+
+# Configuración de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logger.info("Aplicación iniciada")
+
 @router.post("/login")
 def login(request: LoginRequest, db: Session = Depends(get_db_session)):
     user = db.query(User).filter(User.email == request.email).first()
@@ -318,20 +326,14 @@ def login(request: LoginRequest, db: Session = Depends(get_db_session)):
     if not user or not verify_password(request.password, user.password_hash):
         return create_response("error", "Credenciales incorrectas")
 
-    # Usar get_status para verificar si el usuario está en estado "Verificado"
     status_verified = get_status(db, "Verificado", "User")
     if not status_verified or user.status_id != status_verified.status_id:
-        
-        # Usuario no verificado, generar un nuevo token de verificación
         new_verification_token = generate_verification_token(4)
         user.verification_token = new_verification_token
 
         try:
-            # Guardar el nuevo token en la base de datos
             db.commit()
-            # Enviar correo con el nuevo token de verificación
             send_email(user.email, new_verification_token, 'verification')
-
             return create_response("error", "Debes verificar tu correo antes de iniciar sesión")
         except Exception as e:
             db.rollback()
@@ -340,8 +342,12 @@ def login(request: LoginRequest, db: Session = Depends(get_db_session)):
     try:
         session_token = generate_verification_token(32)
         user.session_token = session_token
-        user.fcm_token = request.fcm_token  # Guardar el token FCM del usuario
+        user.fcm_token = request.fcm_token
         db.commit()
+
+        # Agrega un log para asegurarte de que el token fue generado
+        logger.info(f"Session token generado para {user.email}: {session_token}")
+
         return create_response("success", "Inicio de sesión exitoso", {"session_token": session_token, "name": user.name})
     except Exception as e:
         db.rollback()

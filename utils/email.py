@@ -172,7 +172,7 @@ def send_email(email, token, email_type, farm_name=None, owner_name=None, sugges
         </body>
         </html>
         """
-    if email_type == 'invitation':
+    elif email_type == 'invitation':
         subject = "Invitación a CoffeTech"
         body_html = f"""
         <!DOCTYPE html>

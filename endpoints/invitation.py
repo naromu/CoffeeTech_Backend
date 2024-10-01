@@ -171,9 +171,7 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
         db.add(new_notification)
         db.commit()
 
-        # Enviar correo de invitación
-        send_email(invitation_data.email, invitation_data.farm_id, 'invitation', farm.name, user.name, invitation_data.suggested_role)
-
+    
         # Enviar notificación FCM al usuario
         if fcm_token := existing_user.fcm_token:
             title = "Nueva Invitación"
