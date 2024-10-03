@@ -19,11 +19,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class CreateFarmRequest(BaseModel):
+    """
+    Modelo de datos para la creación de una finca.
+
+    **Atributos**:
+    - **name**: Nombre de la finca (cadena de texto). Debe ser un valor no vacío ni contener solo espacios.
+    - **area**: Área de la finca (float). Debe ser un número positivo mayor que cero.
+    - **unitMeasure**: Unidad de medida del área (cadena de texto). Debe ser una unidad de medida válida como 'hectáreas' o 'metros cuadrados'.
+    """
     name: str
     area: float
     unitMeasure: str
     
 class ListFarmResponse(BaseModel):
+    """
+    Modelo de datos para la respuesta al listar fincas.
+
+    **Atributos**:
+    - **farm_id**: ID único de la finca (entero).
+    - **name**: Nombre de la finca (cadena de texto).
+    - **area**: Área de la finca (float), representada en la unidad de medida especificada.
+    - **unit_of_measure**: Unidad de medida del área (cadena de texto).
+    - **status**: Estado actual de la finca (cadena de texto), por ejemplo, 'Activo' o 'Inactivo'.
+    - **role**: Rol del usuario en relación a la finca (cadena de texto), como 'Propietario' o 'Administrador'.
+    """
     farm_id: int
     name: str
     area: float
@@ -32,6 +51,15 @@ class ListFarmResponse(BaseModel):
     role: str
     
 class UpdateFarmRequest(BaseModel):
+    """
+    Modelo de datos para la actualización de una finca existente.
+
+    **Atributos**:
+    - **farm_id**: ID de la finca a actualizar (entero). Debe existir una finca con este ID.
+    - **name**: Nuevo nombre de la finca (cadena de texto). No puede estar vacío ni contener solo espacios.
+    - **area**: Nueva área de la finca (float). Debe ser un número positivo mayor que cero.
+    - **unitMeasure**: Nueva unidad de medida del área (cadena de texto). Debe ser una unidad de medida válida como 'hectáreas' o 'metros cuadrados'.
+    """
     farm_id: int
     name: str
     area: float
@@ -42,6 +70,38 @@ class UpdateFarmRequest(BaseModel):
 
 @router.post("/create-farm")
 def create_farm(request: CreateFarmRequest, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Crea una nueva finca y asigna al usuario como propietario.
+
+    **Parámetros**:
+    - **request**: Objeto que contiene los datos de la finca (nombre, área, y unidad de medida).
+    - **session_token**: Token de sesión del usuario.
+    - **db**: Sesión de base de datos, se obtiene automáticamente.
+
+    **Respuestas**:
+    - **200 OK**: Finca creada y usuario asignado correctamente.
+    - **400 Bad Request**: Si los datos de la finca no son válidos o no se encuentra el estado requerido.
+    - **401 Unauthorized**: Si el token de sesión es inválido o el usuario no tiene permisos.
+    - **500 Internal Server Error**: Si ocurre un error al intentar crear la finca o asignar el usuario.
+
+    **Ejemplo de respuesta exitosa**:
+    {
+        "status": "success",
+        "message": "Finca creada y usuario asignado correctamente",
+        "data": {
+            "farm_id": 1,
+            "name": "Mi Finca",
+            "area": 100.0,
+            "unit_of_measure": "hectárea"
+        }
+    }
+
+    **Ejemplo de respuesta de error**:
+    {
+        "status": "error",
+        "message": "Ya existe una finca activa con el nombre 'Mi Finca'"
+    }
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -141,6 +201,31 @@ def create_farm(request: CreateFarmRequest, session_token: str, db: Session = De
 
 @router.post("/list-farm")
 def list_farm(session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Endpoint para listar las fincas activas asociadas a un usuario autenticado mediante un token de sesión.
+
+    **Parámetros**:
+    - **session_token**: Token de sesión proporcionado por el usuario para autenticarse.
+    - **db**: Sesión de base de datos proporcionada por FastAPI a través de la dependencia.
+
+    **Descripción**:
+    1. **Verificar sesión**: 
+       Se verifica el token de sesión del usuario. Si no es válido, se devuelve una respuesta de token inválido.
+    
+    2. **Obtener estados activos**: 
+       Se buscan los estados "Activo" tanto para las fincas como para la relación `user_role_farm` que define el rol del usuario en la finca.
+    
+    3. **Realizar la consulta**: 
+       Se realiza una consulta a la base de datos para obtener las fincas activas asociadas al usuario autenticado, filtrando por estado "Activo" tanto en la finca como en la relación `user_role_farm`.
+    
+    4. **Construir la respuesta**: 
+       Se construye una lista de las fincas obtenidas, incluyendo detalles como el nombre de la finca, área, unidad de medida, estado y el rol del usuario.
+
+    **Respuestas**:
+    - **200**: Lista de fincas obtenida exitosamente.
+    - **400**: Error al obtener los estados activos para las fincas o la relación `user_role_farm`.
+    - **500**: Error interno del servidor durante la consulta.
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -196,6 +281,38 @@ def list_farm(session_token: str, db: Session = Depends(get_db_session)):
     
 @router.post("/update-farm")
 def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Endpoint para actualizar la información de una finca asociada a un usuario autenticado.
+
+    **Parámetros**:
+    - **request**: Objeto de tipo `UpdateFarmRequest` que contiene los datos a actualizar de la finca (nombre, área, unidad de medida).
+    - **session_token**: Token de sesión proporcionado por el usuario para autenticarse.
+    - **db**: Sesión de base de datos proporcionada por FastAPI a través de la dependencia.
+
+    **Descripción**:
+    1. **Verificar sesión**: 
+       Se verifica el token de sesión del usuario. Si no es válido, se devuelve una respuesta de token inválido.
+    
+    2. **Verificar asociación de usuario**: 
+       Se verifica si el usuario está asociado con la finca activa que desea actualizar y si tiene el rol adecuado para editar.
+    
+    3. **Verificar permisos de edición**: 
+       Se comprueba si el rol del usuario tiene permisos para editar fincas.
+
+    4. **Validaciones de nombre y área**: 
+       Se valida que el nombre no esté vacío, que no exceda los 50 caracteres y que el área sea mayor que cero. También se valida la unidad de medida.
+
+    5. **Verificar existencia de finca y nombre duplicado**: 
+       Se busca la finca en la base de datos y se verifica si el nuevo nombre ya está en uso por otra finca del mismo usuario.
+
+    6. **Actualizar finca**: 
+       Si todas las validaciones son correctas, se actualizan los datos de la finca en la base de datos.
+
+    **Respuestas**:
+    - **200**: Finca actualizada correctamente.
+    - **400**: Error en las validaciones de nombre, área o permisos de usuario.
+    - **500**: Error interno del servidor durante la actualización.
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -293,6 +410,46 @@ def update_farm(request: UpdateFarmRequest, session_token: str, db: Session = De
 
 @router.get("/get-farm/{farm_id}")
 def get_farm(farm_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Obtiene los detalles de una finca específica en la que el usuario tiene permisos.
+    
+    **Parámetros:**
+    - `farm_id` (int): ID de la finca a consultar.
+    - `session_token` (str): Token de sesión del usuario que está haciendo la solicitud.
+
+    **Respuesta exitosa (200):**
+    - **Descripción**: Devuelve la información de la finca, incluyendo nombre, área, unidad de medida, estado y rol del usuario en relación a la finca.
+    - **Ejemplo de respuesta:**
+      ```json
+      {
+          "status": "success",
+          "message": "Finca obtenida exitosamente",
+          "data": {
+              "farm": {
+                  "farm_id": 1,
+                  "name": "Finca Ejemplo",
+                  "area": 10.5,
+                  "unit_of_measure": "Hectárea",
+                  "status": "Activo",
+                  "role": "Dueño"
+              }
+          }
+      }
+      ```
+
+    **Errores:**
+    - **401 Unauthorized**: Si el token de sesión es inválido o el usuario no se encuentra.
+    - **400 Bad Request**: Si no se encuentra el estado "Activo" para la finca o para la relación `user_role_farm`.
+    - **404 Not Found**: Si la finca no se encuentra o no pertenece al usuario.
+
+    **Ejemplo de respuesta de error:**
+    ```json
+    {
+        "status": "error",
+        "message": "Finca no encontrada o no pertenece al usuario"
+    }
+    ```
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -354,6 +511,38 @@ def get_farm(farm_id: int, session_token: str, db: Session = Depends(get_db_sess
 
 @router.post("/delete-farm/{farm_id}")
 def delete_farm(farm_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Elimina (inactiva) una finca específica.
+
+    **Parámetros:**
+    - `farm_id` (int): ID de la finca a eliminar.
+    - `session_token` (str): Token de sesión del usuario que está haciendo la solicitud.
+
+    **Respuesta exitosa (200):**
+    - **Descripción**: Indica que la finca ha sido desactivada correctamente.
+    - **Ejemplo de respuesta:**
+      ```json
+      {
+          "status": "success",
+          "message": "Finca puesta en estado 'Inactiva' correctamente"
+      }
+      ```
+
+    **Errores:**
+    - **401 Unauthorized**: Si el token de sesión es inválido o el usuario no se encuentra.
+    - **400 Bad Request**: Si no se encuentra el estado "Activo" para la finca o para la relación `user_role_farm`.
+    - **403 Forbidden**: Si el usuario no tiene permiso para eliminar la finca.
+    - **404 Not Found**: Si la finca no se encuentra.
+    - **500 Internal Server Error**: Si ocurre un error al desactivar la finca.
+
+    **Ejemplo de respuesta de error:**
+    ```json
+    {
+        "status": "error",
+        "message": "No tienes permiso para eliminar esta finca"
+    }
+    ```
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:

@@ -11,6 +11,18 @@ def create_response(
     data: Optional[Any] = None,  # Permitir cualquier tipo de datos
     status_code: int = 200
 ) -> JSONResponse:
+    """
+    Crea una respuesta JSON estructurada para ser devuelta por la API.
+
+    Args:
+        status (str): Estado de la respuesta (ej. "success" o "error").
+        message (str): Mensaje que describe el estado de la respuesta.
+        data (Optional[Any], optional): Datos adicionales a incluir en la respuesta. Puede ser cualquier tipo. Por defecto es None.
+        status_code (int, optional): Código de estado HTTP a devolver. Por defecto es 200.
+
+    Returns:
+        JSONResponse: Respuesta en formato JSON que incluye el estado, mensaje y datos.
+    """
     # Si data es un diccionario, procesar los valores
     if isinstance(data, dict):
         for key, value in data.items():
@@ -36,6 +48,12 @@ def create_response(
 
 
 def session_token_invalid_response() -> JSONResponse:
+    """
+    Crea una respuesta JSON específica para cuando el token de sesión es inválido.
+
+    Returns:
+        JSONResponse: Respuesta en formato JSON que indica que las credenciales han expirado.
+    """
     return create_response(
         status="error",
         message="Credenciales expiradas, cerrando sesión.",

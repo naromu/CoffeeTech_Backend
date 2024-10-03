@@ -17,6 +17,9 @@ def send_email(email, token, email_type, farm_name=None, owner_name=None, sugges
     :param email: Dirección de correo electrónico del destinatario.
     :param token: Token a incluir en el cuerpo del correo electrónico.
     :param email_type: Tipo de correo a enviar ('verification', 'reset' o 'invitation').
+    :param farm_name: Nombre de la finca (opcional, solo para invitación).
+    :param owner_name: Nombre del dueño (opcional, solo para invitación).
+    :param suggested_role: Rol sugerido para el invitado (opcional, solo para invitación).
     """
     smtp_user = os.getenv("SMTPP_USER")
     smtp_pass = os.getenv("SMTPP_PASS")

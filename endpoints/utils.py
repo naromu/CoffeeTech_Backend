@@ -6,16 +6,21 @@ from sqlalchemy.orm import joinedload
 
 router = APIRouter()
 
-
-
-
-@router.get("/list-roles")
+@router.get("/list-roles", summary="Obtener lista de roles", description="Obtiene una lista de todos los roles disponibles junto con sus permisos asociados.")
 def list_roles(db: Session = Depends(get_db_session)):
-    # Consulta los roles y carga los permisos asociados utilizando `joinedload`
+    """
+    Obtiene una lista de todos los roles disponibles junto con sus permisos asociados.
+
+    Args:
+        db (Session): Sesión de base de datos proporcionada por la dependencia.
+
+    Returns:
+        dict: Diccionario con el estado, mensaje y datos de los roles y sus permisos.
+    """
+    # Consulta los roles y carga los permisos asociados
     roles = db.query(Role).all()
 
     # Construir la respuesta con roles y sus permisos
-
     return {
         "status": "success",
         "message": "Roles obtenidos correctamente",
@@ -35,10 +40,7 @@ def list_roles(db: Session = Depends(get_db_session)):
     }
 
 
-
-
-@router.get("/unit-measure")
-
+@router.get("/unit-measure", summary="Obtener lista de unidades de medida", description="Obtiene una lista de todas las unidades de medida disponibles junto con su tipo correspondiente.")
 def list_unit_measures(db: Session = Depends(get_db_session)):
     """
     Obtiene una lista de todas las unidades de medida disponibles junto con su tipo correspondiente.
@@ -49,8 +51,10 @@ def list_unit_measures(db: Session = Depends(get_db_session)):
     Returns:
         dict: Diccionario con el estado, mensaje y datos de las unidades de medida y sus tipos.
     """
+    # Consulta todas las unidades de medida
     units_of_measure = db.query(UnitOfMeasure).all()
 
+    # Construir la respuesta con las unidades de medida
     return {
         "status": "success",
         "message": "Unidades de medida obtenidas correctamente",
@@ -66,13 +70,23 @@ def list_unit_measures(db: Session = Depends(get_db_session)):
             } for uom in units_of_measure
         ]
     }
-    
-@router.get("/list-coffee-varieties")
+
+
+@router.get("/list-coffee-varieties", summary="Obtener lista de variedades de café", description="Obtiene una lista de todas las variedades de café disponibles junto con sus parcelas asociadas.")
 def list_coffee_varieties(db: Session = Depends(get_db_session)):
-    # Consulta todas las variedades de café y carga las parcelas asociadas usando `joinedload`
+    """
+    Obtiene una lista de todas las variedades de café disponibles junto con sus parcelas asociadas.
+
+    Args:
+        db (Session): Sesión de base de datos proporcionada por la dependencia.
+
+    Returns:
+        dict: Diccionario con el estado, mensaje y datos de las variedades de café.
+    """
+    # Consulta todas las variedades de café y carga las parcelas asociadas
     varieties = db.query(CoffeeVariety).options(joinedload(CoffeeVariety.plots)).all()
 
-    # Construir la respuesta con las variedades y sus parcelas asociadas
+    # Construir la respuesta con las variedades de café y sus parcelas asociadas
     return {
         "status": "success",
         "message": "Variedades de café obtenidas correctamente",

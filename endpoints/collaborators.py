@@ -29,6 +29,15 @@ router = APIRouter()
 
 # Modelo Pydantic actualizado para la respuesta de colaborador
 class Collaborator(BaseModel):
+    """
+    Modelo Pydantic para representar un colaborador.
+
+    Attributes:
+        user_id (int): ID del usuario del colaborador.
+        name (str): Nombre del colaborador.
+        email (EmailStr): Correo electrónico del colaborador.
+        role (str): Rol del colaborador.
+    """
     user_id: int          # Campo para el ID del usuario
     name: str
     email: EmailStr
@@ -39,6 +48,13 @@ class Collaborator(BaseModel):
         
 # Modelo Pydantic para la solicitud de edición de rol
 class EditCollaboratorRoleRequest(BaseModel):
+    """
+    Modelo Pydantic para la solicitud de edición de rol de un colaborador.
+
+    Attributes:
+        collaborator_user_id (int): ID del usuario colaborador cuyo rol se desea editar.
+        new_role (str): Nuevo rol que se asignará al colaborador.
+    """
     collaborator_user_id: int = Field(..., alias="collaborator_user_id")
     new_role: str
 
@@ -47,11 +63,18 @@ class EditCollaboratorRoleRequest(BaseModel):
         from_attributes = True    # Reemplaza 'orm_mode = True'
 
     def validate_input(self):
+        """Valida que el nuevo rol sea válido."""
         if self.new_role not in ["Administrador de finca", "Operador de campo"]:
             raise ValueError("El rol debe ser 'Administrador de finca' o 'Operador de campo'.")
         
 # Modelo Pydantic para la solicitud de eliminación de colaborador
 class DeleteCollaboratorRequest(BaseModel):
+    """
+    Modelo Pydantic para la solicitud de eliminación de un colaborador.
+
+    Attributes:
+        collaborator_user_id (int): ID del usuario colaborador que se desea eliminar.
+    """
     collaborator_user_id: int = Field(..., alias="collaborator_user_id")
 
     class Config:
@@ -70,7 +93,14 @@ def list_collaborators(
 ):
     """
     Endpoint para listar los colaboradores de una finca específica.
-    Requiere `farm_id` y `session_token` como parámetros.
+
+    Args:
+        farm_id (int): ID de la finca de la cual se listarán los colaboradores.
+        session_token (str): Token de sesión del usuario autenticado.
+        db (Session): Sesión de la base de datos.
+
+    Returns:
+        Dict[str, Any]: Respuesta con el estado de la operación y la lista de colaboradores.
     """
 
     # 1. Verificar el session_token y obtener el usuario autenticado
@@ -179,8 +209,44 @@ def edit_collaborator_role(
     db: Session = Depends(get_db_session)
 ):
     """
+    ### Descripción:
     Endpoint para editar el rol de un colaborador en una finca específica.
-    Requiere `farm_id`, `session_token` y un cuerpo de solicitud con `collaborator_user_id` y `new_role`.
+
+    ### Parámetros:
+    - **edit_request (EditCollaboratorRoleRequest)**: Objeto con los campos `collaborator_user_id` y `new_role`, que contiene la información del colaborador y el nuevo rol que se le asignará.
+    - **farm_id (int)**: ID de la finca donde se cambiará el rol del colaborador.
+    - **session_token (str)**: Token de sesión del usuario autenticado que está realizando la acción.
+    - **db (Session)**: Sesión de la base de datos obtenida mediante la dependencia `get_db_session`.
+
+    ### Proceso:
+    1. **Validación de entrada**: Se valida la solicitud recibida.
+    2. **Autenticación**: Se verifica el `session_token` para autenticar al usuario.
+    3. **Verificación de la finca**: Se comprueba si la finca existe.
+    4. **Estado 'Activo'**: Se busca el estado 'Activo' para roles en fincas (`user_role_farm`).
+    5. **Rol actual del usuario**: Se verifica el rol del usuario que realiza la acción en la finca.
+    6. **Verificación del colaborador**: Se obtiene al colaborador cuyo rol se desea editar.
+    7. **Evitar auto-cambio de rol**: El usuario no puede cambiar su propio rol.
+    8. **Rol del colaborador actual**: Se comprueba el rol actual del colaborador en la finca.
+    9. **Permisos necesarios**: Se verifican los permisos del usuario para asignar el nuevo rol.
+    10. **Jerarquía de roles**: Se valida la jerarquía de roles para determinar si el usuario puede asignar el nuevo rol.
+    11. **Rol objetivo**: Se obtiene el rol que se desea asignar al colaborador.
+    12. **Actualización del rol**: Se actualiza el rol del colaborador en la base de datos.
+    
+    ### Respuestas:
+    - **200 (success)**: El rol del colaborador ha sido actualizado exitosamente.
+    - **400 (error)**: Error de validación de entrada o intento de asignar el mismo rol.
+    - **403 (error)**: El usuario no tiene permisos suficientes o intentó cambiar su propio rol.
+    - **404 (error)**: La finca o el colaborador no existen.
+    - **500 (error)**: Error interno del servidor al procesar la solicitud.
+    
+    ### Ejemplo de respuesta:
+    ```json
+    {
+        "status": "success",
+        "message": "Rol del colaborador 'Juan Pérez' actualizado a 'Administrador de finca' exitosamente",
+        "status_code": 200
+    }
+    ```
     """
 
     # Validar la entrada
@@ -430,8 +496,23 @@ def delete_collaborator(
     db: Session = Depends(get_db_session)
 ):
     """
-    Endpoint para eliminar a un colaborador de una finca específica.
-    Requiere `farm_id`, `session_token` y un cuerpo de solicitud con `collaborator_user_id`.
+    Elimina un colaborador de una finca específica.
+
+    Parámetros:
+    - delete_request (DeleteCollaboratorRequest): Cuerpo de la solicitud que contiene el ID del colaborador a eliminar.
+    - farm_id (int): ID de la finca desde la que se eliminará al colaborador.
+    - session_token (str): Token de sesión del usuario que realiza la solicitud.
+    - db (Session): Sesión de la base de datos proporcionada por FastAPI con `Depends`.
+
+    Retornos:
+    - Dict[str, Any]: Respuesta indicando éxito o error con el mensaje adecuado.
+
+    Posibles Respuestas:
+    - 200: Colaborador eliminado exitosamente.
+    - 400: Error en la validación de la solicitud o algún otro fallo.
+    - 403: El usuario no tiene permisos o está intentando eliminarse a sí mismo.
+    - 404: Finca o colaborador no encontrado.
+    - 500: Error en el servidor o al actualizar la base de datos.
     """
 
     # 1. Validar la entrada

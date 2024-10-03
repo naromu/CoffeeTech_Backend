@@ -18,34 +18,48 @@ logger = logging.getLogger(__name__)
 
 # Modelos Pydantic para las solicitudes y respuestas
 class CreatePlotRequest(BaseModel):
-    name: str = Field(..., max_length=100)
-    coffee_variety_name: str
-    latitude: str
-    longitude: str
-    altitude: str
-    farm_id: int
+    """Modelo para la solicitud de creación de un lote (plot)."""
+    name: str = Field(..., max_length=100, description="Nombre del lote. Máximo 100 caracteres.")
+    coffee_variety_name: str = Field(..., description="Nombre de la variedad de café.")
+    latitude: str = Field(..., description="Latitud del lote.")
+    longitude: str = Field(..., description="Longitud del lote.")
+    altitude: str = Field(..., description="Altitud del lote.")
+    farm_id: int = Field(..., description="ID de la finca a la que pertenece el lote.")
 
 class UpdatePlotGeneralInfoRequest(BaseModel):
-    plot_id: int
-    name: str = Field(..., max_length=100)
-    coffee_variety_name: str
+    """Modelo para la solicitud de actualización de información general de un lote."""
+    plot_id: int = Field(..., description="ID del lote a actualizar.")
+    name: str = Field(..., max_length=100, description="Nuevo nombre del lote. Máximo 100 caracteres.")
+    coffee_variety_name: str = Field(..., description="Nombre de la nueva variedad de café.")
 
 class UpdatePlotLocationRequest(BaseModel):
-    plot_id: int
-    latitude: str
-    longitude: str
-    altitude: str
-
+    """Modelo para la solicitud de actualización de la ubicación de un lote."""
+    plot_id: int = Field(..., description="ID del lote a actualizar.")
+    latitude: str = Field(..., description="Nueva latitud del lote.")
+    longitude: str = Field(..., description="Nueva longitud del lote.")
+    altitude: str = Field(..., description="Nueva altitud del lote.")
 
 # Endpoint para crear un lote
 @router.post("/create-plot")
 def create_plot(request: CreatePlotRequest, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Crea un nuevo lote (plot) en una finca.
+    
+    Parámetros:
+    - request (CreatePlotRequest): Los datos necesarios para crear el lote.
+    - session_token (str): Token de sesión del usuario.
+    - db (Session): Sesión de base de datos.
+
+    Retorna:
+    - Respuesta exitosa con los datos del lote creado, o un error si algo falla.
+    """
+
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
         return session_token_invalid_response()
-    
+
     # Obtener los estados "Activo" para Farm y UserRoleFarm
     active_farm_status = get_status(db, "Activo", "Farm")
     if not active_farm_status:
@@ -141,9 +155,21 @@ def create_plot(request: CreatePlotRequest, session_token: str, db: Session = De
         logger.error("Error al crear el lote: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Error al crear el lote: {str(e)}")
 
+
 # Endpoint para actualizar información general del lote
-@router.post("/update-plot-general-info")
+@router.post("/update-plot-general-info", summary="Actualizar información general del lote", description="Actualiza el nombre y la variedad de café de un lote específico.")
 def update_plot_general_info(request: UpdatePlotGeneralInfoRequest, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Actualiza el nombre y la variedad de café de un lote específico.
+
+    Args:
+        request (UpdatePlotGeneralInfoRequest): Contiene la nueva información del lote.
+        session_token (str): Token de sesión del usuario para autenticar la solicitud.
+        db (Session): Sesión de base de datos proporcionada por la dependencia.
+
+    Returns:
+        dict: Respuesta indicando el estado del proceso de actualización del lote.
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -236,8 +262,19 @@ def update_plot_general_info(request: UpdatePlotGeneralInfoRequest, session_toke
         raise HTTPException(status_code=500, detail=f"Error al actualizar el lote: {str(e)}")
 
 # Endpoint para actualizar la ubicación del lote
-@router.post("/update-plot-location")
+@router.post("/update-plot-location", summary="Actualizar ubicación del lote", description="Actualiza las coordenadas geográficas (latitud, longitud, altitud) de un lote específico.")
 def update_plot_location(request: UpdatePlotLocationRequest, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Actualiza las coordenadas geográficas (latitud, longitud, altitud) de un lote específico.
+
+    Args:
+        request (UpdatePlotLocationRequest): Contiene la nueva ubicación del lote.
+        session_token (str): Token de sesión del usuario para autenticar la solicitud.
+        db (Session): Sesión de base de datos proporcionada por la dependencia.
+
+    Returns:
+        dict: Respuesta indicando el estado del proceso de actualización de la ubicación del lote.
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -307,8 +344,20 @@ def update_plot_location(request: UpdatePlotLocationRequest, session_token: str,
         raise HTTPException(status_code=500, detail=f"Error al actualizar la ubicación del lote: {str(e)}")
 
 # Endpoint para listar todos los lotes de una finca
-@router.get("/list-plots/{farm_id}")
+@router.get("/list-plots/{farm_id}", summary="Listar los lotes de una finca", tags=["Plots"])
 def list_plots(farm_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Obtiene una lista de todos los lotes activos de una finca específica.
+
+    - **farm_id**: ID de la finca.
+    - **session_token**: Token de sesión del usuario autenticado.
+
+    **Respuestas**:
+    - **200**: Lista de lotes obtenida exitosamente.
+    - **400**: Token inválido o falta de permisos para ver los lotes.
+    - **404**: Finca no encontrada o inactiva.
+    - **500**: Error al obtener la lista de lotes.
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -373,8 +422,21 @@ def list_plots(farm_id: int, session_token: str, db: Session = Depends(get_db_se
         raise HTTPException(status_code=500, detail=f"Error al obtener la lista de lotes: {str(e)}")
 
 # Endpoint para obtener la información de un lote específico
-@router.get("/get-plot/{plot_id}")
+@router.get("/get-plot/{plot_id}", summary="Obtener información de un lote", tags=["Plots"])
 def get_plot(plot_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Obtiene la información detallada de un lote específico.
+
+    - **plot_id**: ID del lote.
+    - **session_token**: Token de sesión del usuario autenticado.
+
+    **Respuestas**:
+    - **200**: Información del lote obtenida exitosamente.
+    - **400**: Token inválido o falta de permisos para ver el lote.
+    - **404**: Lote no encontrado o inactivo.
+    - **500**: Error al obtener la información del lote.
+    """
+
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -436,8 +498,21 @@ def get_plot(plot_id: int, session_token: str, db: Session = Depends(get_db_sess
     return create_response("success", "Lote obtenido exitosamente", {"plot": plot_info})
 
 # Endpoint para eliminar un lote (poner en estado 'Inactivo')
-@router.post("/delete-plot/{plot_id}")
+@router.post("/delete-plot/{plot_id}", summary="Eliminar un lote (estado inactivo)", tags=["Plots"])
 def delete_plot(plot_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Elimina un lote (cambia su estado a 'Inactivo').
+
+    - **plot_id**: ID del lote.
+    - **session_token**: Token de sesión del usuario autenticado.
+
+    **Respuestas**:
+    - **200**: Lote eliminado exitosamente (estado 'Inactivo').
+    - **400**: Token inválido o falta de permisos para eliminar el lote.
+    - **404**: Lote no encontrado o ya inactivo.
+    - **500**: Error al eliminar el lote.
+    """
+
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:

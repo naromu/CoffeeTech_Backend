@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class InvitationCreate(BaseModel):
+    """
+    Modelo para la creación de una invitación.
+
+    Attributes:
+        email (EmailStr): Dirección de correo electrónico del usuario a invitar.
+        suggested_role (str): Rol sugerido para el usuario invitado.
+        farm_id (int): Identificador de la finca a la que se invita.
+    """
     email: EmailStr
     suggested_role: str  # El campo de role es una cadena
     farm_id: int
@@ -38,6 +46,17 @@ class InvitationCreate(BaseModel):
 
 # Función auxiliar para verificar si el usuario tiene un permiso específico
 def has_permission(user: User, permission_name: str, db: Session) -> bool:
+    """
+    Verifica si el usuario tiene un permiso específico.
+
+    Args:
+        user (User): Usuario a verificar.
+        permission_name (str): Nombre del permiso a verificar.
+        db (Session): Sesión de base de datos.
+
+    Returns:
+        bool: True si el usuario tiene el permiso, False en caso contrario.
+    """
     # Obtener los roles asociados al usuario en la finca
     user_roles = db.query(UserRoleFarm).filter(UserRoleFarm.user_id == user.user_id).all()
 
@@ -54,6 +73,17 @@ def has_permission(user: User, permission_name: str, db: Session) -> bool:
 
 @router.post("/create-invitation")
 def create_invitation(invitation_data: InvitationCreate, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Crea una invitación para un usuario a una finca.
+
+    Args:
+        invitation_data (InvitationCreate): Datos de la invitación a crear.
+        session_token (str): Token de sesión del usuario autenticado.
+        db (Session): Sesión de base de datos.
+
+    Returns:
+        JSONResponse: Respuesta con el resultado de la creación de la invitación.
+    """
     # Validar el session_token y obtener el usuario autenticado (el invitador)
     user = verify_session_token(session_token, db)
     if not user:
@@ -189,6 +219,18 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
 
 @router.post("/respond-invitation/{invitation_id}")
 def respond_invitation(invitation_id: int, action: str, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Responde a una invitación con las acciones 'accept' o 'reject'.
+    
+    Parámetros:
+    - invitation_id: ID de la invitación a procesar.
+    - action: La acción a realizar ('accept' o 'reject').
+    - session_token: Token de sesión del usuario autenticado.
+    - db: Sesión de la base de datos (inyectada mediante Depends).
+    
+    Retorna:
+    - Un mensaje de éxito o error en función de la acción realizada.
+    """
     # Validar el session_token y obtener el usuario autenticado
     user = verify_session_token(session_token, db)
     if not user:

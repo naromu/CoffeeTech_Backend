@@ -7,6 +7,10 @@ from sqlalchemy.ext.declarative import declarative_base
 
 # Función para recargar .env
 def reload_env():
+    """
+    Carga las variables de entorno desde el archivo .env, 
+    sobrescribiendo las existentes si es necesario.
+    """
     load_dotenv(override=True)
 
 # Cargar variables de entorno
@@ -40,6 +44,14 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def get_db_session():
+    """
+    Proporciona una sesión de base de datos, que se puede utilizar 
+    en las operaciones CRUD. Asegura que la sesión se cierre 
+    correctamente después de su uso.
+
+    Yields:
+        Session: Una sesión de base de datos.
+    """
     db = SessionLocal()
     try:
         yield db

@@ -47,6 +47,17 @@ if not firebase_admin._apps:  # Evitar inicializar Firebase múltiples veces
 
 
 def send_fcm_notification(fcm_token: str, title: str, body: str):
+    """
+    Envía una notificación utilizando Firebase Cloud Messaging (FCM).
+
+    Args:
+        fcm_token (str): El token de registro FCM del dispositivo al que se enviará la notificación.
+        title (str): El título de la notificación.
+        body (str): El cuerpo del mensaje de la notificación.
+
+    Raises:
+        Exception: Si hay un error al enviar la notificación.
+    """
     # Construir el mensaje
     message = messaging.Message(
         notification=messaging.Notification(

@@ -6,7 +6,24 @@ from datetime import datetime
 Base = declarative_base()
 
 # Modelo para Farm (Finca)
+
 class Farm(Base):
+    """
+    Modelo de base de datos para representar una finca.
+
+    Atributos:
+    ----------
+    farm_id : int
+        Identificador único de la finca (clave primaria).
+    name : str
+        Nombre de la finca.
+    area : Numeric
+        Área de la finca.
+    area_unit_id : int
+        Unidad de medida del área (relación con UnitOfMeasure).
+    status_id : int
+        Estado actual de la finca (relación con Status).
+    """
     __tablename__ = 'farm'
 
     farm_id = Column(Integer, primary_key=True, index=True, server_default=Sequence('farm_farm_id_seq').next_value())
@@ -25,6 +42,22 @@ class Farm(Base):
 
 # Modelo para UserRoleFarm (relación entre usuarios, roles y fincas)
 class UserRoleFarm(Base):
+    """
+    Relación entre usuarios, roles y fincas.
+
+    Atributos:
+    ----------
+    user_role_farm_id : int
+        Identificador único de la relación.
+    role_id : int
+        Identificador del rol (relación con Role).
+    user_id : int
+        Identificador del usuario (relación con User).
+    farm_id : int
+        Identificador de la finca (relación con Farm).
+    status_id : int
+        Estado actual de la relación.
+    """
     __tablename__ = 'user_role_farm'
 
     user_role_farm_id = Column(Integer, primary_key=True, server_default=Sequence('user_role_farm_user_role_farm_id_seq').next_value())
@@ -42,6 +75,16 @@ class UserRoleFarm(Base):
 
 # Modelo para Role
 class Role(Base):
+    """
+    Representa un rol que un usuario puede tener.
+
+    Atributos:
+    ----------
+    role_id : int
+        Identificador único del rol.
+    name : str
+        Nombre del rol (único).
+    """
     __tablename__ = 'role'
 
     role_id = Column(Integer, primary_key=True, server_default=Sequence('role_role_id_seq').next_value())
@@ -54,6 +97,16 @@ class Role(Base):
 
 # Modelo para UnitOfMeasureType
 class UnitOfMeasureType(Base):
+    """
+    Tipo de unidad de medida (ejemplo: área, volumen).
+
+    Atributos:
+    ----------
+    unit_of_measure_type_id : int
+        Identificador único del tipo de unidad.
+    name : str
+        Nombre del tipo de unidad.
+    """
     __tablename__ = 'unit_of_measure_type'
 
     unit_of_measure_type_id = Column(Integer, primary_key=True, server_default=Sequence('unit_of_measure_type_unit_of_measure_type_id_seq').next_value())
@@ -65,6 +118,20 @@ class UnitOfMeasureType(Base):
 
 # Modelo para UnitOfMeasure
 class UnitOfMeasure(Base):
+    """
+    Representa una unidad de medida (ejemplo: hectáreas, metros).
+
+    Atributos:
+    ----------
+    unit_of_measure_id : int
+        Identificador único de la unidad de medida.
+    name : str
+        Nombre de la unidad de medida.
+    abbreviation : str
+        Abreviación de la unidad de medida.
+    unit_of_measure_type_id : int
+        Relación con el tipo de unidad de medida.
+    """
     __tablename__ = 'unit_of_measure'
 
     unit_of_measure_id = Column(Integer, primary_key=True, server_default=Sequence('unit_of_measure_unit_of_measure_id_seq').next_value())
@@ -78,6 +145,16 @@ class UnitOfMeasure(Base):
 
 # Definición del modelo StatusType
 class StatusType(Base):
+    """
+    Representa los tipos de estado de los registros.
+
+    Atributos:
+    ----------
+    status_type_id : int
+        Identificador único del tipo de estado.
+    name : str
+        Nombre del tipo de estado.
+    """
     __tablename__ = 'status_type'
 
     status_type_id = Column(Integer, primary_key=True, server_default=Sequence('status_type_status_type_id_seq').next_value())
@@ -89,6 +166,20 @@ class StatusType(Base):
 
 # Definición del modelo Status
 class Status(Base):
+    """
+    Representa un estado de un registro (ejemplo: activo, inactivo).
+
+    Atributos:
+    ----------
+    status_id : int
+        Identificador único del estado.
+    name : str
+        Nombre del estado.
+    description : str
+        Descripción del estado.
+    status_type_id : int
+        Relación con el tipo de estado.
+    """
     __tablename__ = "status"
 
     status_id = Column(Integer, primary_key=True, server_default=Sequence('status_status_id_seq').next_value())
@@ -109,6 +200,28 @@ class Status(Base):
 
 # Definición del modelo User
 class User(Base):
+    """
+    Representa un usuario en el sistema.
+
+    Atributos:
+    ----------
+    user_id : int
+        Identificador único del usuario.
+    name : str
+        Nombre del usuario.
+    email : str
+        Correo electrónico del usuario.
+    password_hash : str
+        Hash de la contraseña del usuario.
+    verification_token : str
+        Token de verificación del usuario.
+    session_token : str
+        Token de sesión del usuario.
+    fcm_token : str
+        Token de Firebase Cloud Messaging del usuario.
+    status_id : int
+        Relación con el estado del usuario.
+    """
     __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True, index=True, server_default=Sequence('users_user_id_seq').next_value())
@@ -128,6 +241,19 @@ class User(Base):
 
 # Modelo para Permission
 class Permission(Base):
+    """
+    Representa un permiso en el sistema.
+
+    Atributos:
+    ----------
+    permission_id : int
+        Identificador único del permiso.
+    description : str
+        Descripción del permiso.
+    name : str
+        Nombre del permiso.
+    """
+
     __tablename__ = 'permission'
 
     permission_id = Column(Integer, primary_key=True, index=True, server_default=Sequence('permission_permission_id_seq').next_value())
@@ -140,6 +266,16 @@ class Permission(Base):
 
 # Modelo para RolePermission
 class RolePermission(Base):
+    """
+    Representa la relación entre roles y permisos.
+
+    Atributos:
+    ----------
+    role_id : int
+        Identificador del rol.
+    permission_id : int
+        Identificador del permiso.
+    """
     __tablename__ = 'role_permission'
 
     role_id = Column(Integer, ForeignKey('role.role_id'), primary_key=True, nullable=False)
@@ -152,6 +288,26 @@ class RolePermission(Base):
 
 # Modelo para Invitation
 class Invitation(Base):
+    """
+    Representa una invitación para un usuario.
+
+    Atributos:
+    ----------
+    invitation_id : int
+        Identificador único de la invitación.
+    email : str
+        Correo electrónico del invitado.
+    suggested_role : str
+        Rol sugerido para el invitado.
+    status_id : int
+        Relación con el estado de la invitación.
+    farm_id : int
+        Relación con la finca a la que se invita.
+    inviter_user_id : int
+        Identificador del usuario que envía la invitación.
+    date : datetime
+        Fecha de creación de la invitación.
+    """
     __tablename__ = 'invitation'
 
     invitation_id = Column(Integer, primary_key=True, server_default=Sequence('invitation_invitation_id_seq').next_value())
@@ -171,6 +327,16 @@ class Invitation(Base):
 
 # Modelo para NotificationType
 class NotificationType(Base):
+    """
+    Representa el tipo de notificación.
+
+    Atributos:
+    ----------
+    notification_type_id : int
+        Identificador único del tipo de notificación.
+    name : str
+        Nombre del tipo de notificación.
+    """
     __tablename__ = 'notification_type'
 
     notification_type_id = Column(Integer, primary_key=True, server_default=Sequence('notification_type_notification_type_id_seq').next_value())
@@ -182,6 +348,30 @@ class NotificationType(Base):
 
 # Modelo para Notification
 class Notification(Base):
+    """
+    Representa una notificación en el sistema.
+
+    Atributos:
+    ----------
+    notifications_id : int
+        Identificador único de la notificación.
+    message : str
+        Mensaje de la notificación.
+    date : datetime
+        Fecha de creación de la notificación.
+    user_id : int
+        Identificador del usuario que recibe la notificación.
+    invitation_id : int
+        Identificador de la invitación relacionada, si aplica.
+    notification_type_id : int
+        Tipo de notificación.
+    reminder_time : datetime
+        Tiempo para el recordatorio de la notificación.
+    farm_id : int
+        Identificador de la finca relacionada, si aplica.
+    status_id : int
+        Relación con el estado de la notificación.
+    """
     __tablename__ = 'notifications'
 
     notifications_id = Column(Integer, primary_key=True, server_default=Sequence('notifications_notifications_id_seq').next_value())
@@ -207,6 +397,28 @@ class Notification(Base):
 
 # Modelo para Plot
 class Plot(Base):
+    """
+    Representa un lote de cultivo en una finca.
+
+    Atributos:
+    ----------
+    plot_id : int
+        Identificador único del lote.
+    name : str
+        Nombre del lote.
+    longitude : str
+        Longitud del lote.
+    latitude : str
+        Latitud del lote.
+    altitude : str
+        Altitud del lote.
+    coffee_variety_id : int
+        Relación con la variedad de café plantada en el lote.
+    farm_id : int
+        Relación con la finca a la que pertenece el lote.
+    status_id : int
+        Relación con el estado del lote.
+    """
     __tablename__ = 'plot'
 
     plot_id = Column(Integer, primary_key=True, index=True, server_default=Sequence('plot_plot_id_seq').next_value())
@@ -225,6 +437,36 @@ class Plot(Base):
 
 # Modelo para CoffeeVariety
 class CoffeeVariety(Base):
+    """
+    Representa una variedad de café.
+
+    Atributos:
+    ----------
+    coffee_variety_id : int
+        Identificador único de la variedad de café.
+    name : str
+        Nombre de la variedad de café.
+    description : str
+        Descripción de la variedad de café.
+    rust_resistant : bool
+        Indica si la variedad es resistente a la roya.
+    growth_habit : str
+        Hábitos de crecimiento de la variedad.
+    plant_density_sun : float
+        Densidad de plantación en sol (hectáreas por hectárea).
+    plant_density_shade : float
+        Densidad de plantación en sombra (hectáreas por hectárea).
+    production : float
+        Producción esperada (toneladas por hectárea).
+    altitude_min : int
+        Altitud mínima para el cultivo (metros).
+    altitude_max : int
+        Altitud máxima para el cultivo (metros).
+    plant_density_unit_id : int
+        Relación con la unidad de medida para la densidad de plantación.
+    status_id : int
+        Relación con el estado de la variedad de café.
+    """
     __tablename__ = 'coffee_variety'
 
     coffee_variety_id = Column(Integer, primary_key=True, index=True, server_default=Sequence('coffee_variety_coffee_variety_id_seq').next_value())
@@ -247,6 +489,16 @@ class CoffeeVariety(Base):
 
 # Modelo para FloweringType (Tipo de Floración)
 class FloweringType(Base):
+    """
+    Representa un tipo de floración en el sistema.
+
+    Atributos:
+    ----------
+    flowering_type_id : int
+        Identificador único del tipo de floración.
+    name : str
+        Nombre del tipo de floración.
+    """
     __tablename__ = 'flowering_type'
 
     flowering_type_id = Column(Integer, primary_key=True, server_default=Sequence('flowering_type_flowering_type_id_seq').next_value())
@@ -258,6 +510,24 @@ class FloweringType(Base):
 
 # Modelo para Flowering (Floración)
 class Flowering(Base):
+    """
+    Representa un evento de floración en un lote de cultivo.
+
+    Atributos:
+    ----------
+    flowering_id : int
+        Identificador único de la floración.
+    plot_id : int
+        Relación con el lote en el que ocurre la floración.
+    flowering_date : date
+        Fecha de la floración.
+    harvest_date : date
+        Fecha de la cosecha, si aplica.
+    status_id : int
+        Relación con el estado de la floración.
+    flowering_type_id : int
+        Relación con el tipo de floración.
+    """
     __tablename__ = 'flowering'
 
     flowering_id = Column(Integer, primary_key=True, server_default=Sequence('flowering_flowering_id_seq').next_value())

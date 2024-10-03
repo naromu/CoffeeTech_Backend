@@ -19,18 +19,93 @@ logger = logging.getLogger(__name__)
 
 # Modelos Pydantic para las solicitudes y respuestas
 class CreateFloweringRequest(BaseModel):
+    """
+    Modelo para la solicitud de creación de floración.
+
+    Attributes:
+        plot_id (int): ID del lote donde se realiza la floración.
+        flowering_type_name (str): Nombre del tipo de floración.
+        flowering_date (date): Fecha en que ocurre la floración.
+        harvest_date (Optional[date]): Fecha en que se realizará la cosecha (opcional).
+    """
     plot_id: int
     flowering_type_name: str
     flowering_date: date
     harvest_date: Optional[date] = None
 
 class UpdateFloweringRequest(BaseModel):
+    """
+    Modelo para la solicitud de actualización de floración.
+
+    Attributes:
+        flowering_id (int): ID de la floración a actualizar.
+        harvest_date (date): Nueva fecha de cosecha.
+    """
     flowering_id: int
     harvest_date: date
 
 # Endpoint para crear una floración
 @router.post("/create-flowering")
 def create_flowering(request: CreateFloweringRequest, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Endpoint para crear una nueva floración.
+
+    Este endpoint permite agregar una nueva floración a un lote específico. 
+    Requiere un token de sesión para verificar la identidad del usuario y 
+    asegura que el usuario tenga permisos adecuados para realizar esta acción.
+
+    Parameters:
+        request (CreateFloweringRequest): Modelo de solicitud que contiene 
+            los detalles de la floración a crear.
+        session_token (str): Token de sesión del usuario.
+        db (Session, optional): Sesión de la base de datos, inyectada por 
+            FastAPI.
+
+    Returns:
+        dict: Un diccionario que indica el resultado de la operación. Puede 
+            incluir el ID de la floración creada, el estado y otros 
+            detalles.
+
+    Raises:
+        HTTPException: Si ocurre un error en el proceso de creación.
+    
+    **Ejemplo de solicitud:**
+
+    ```json
+    {
+        "plot_id": 1,
+        "flowering_type_name": "Floración A",
+        "flowering_date": "2024-10-01",
+        "harvest_date": "2024-12-15"
+    }
+    ```
+
+    **Ejemplo de respuesta exitosa:**
+
+    ```json
+    {
+        "status": "success",
+        "message": "Floración creada correctamente",
+        "data": {
+            "flowering_id": 123,
+            "plot_id": 1,
+            "flowering_date": "2024-10-01",
+            "harvest_date": "2024-12-15",
+            "status": "Activa",
+            "flowering_type_name": "Floración A"
+        }
+    }
+    ```
+
+    **Ejemplo de respuesta de error:**
+
+    ```json
+    {
+        "status": "error",
+        "message": "La fecha de floración no puede ser en el futuro"
+    }
+    ```
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -144,6 +219,39 @@ def create_flowering(request: CreateFloweringRequest, session_token: str, db: Se
 # Endpoint para actualizar una floración
 @router.post("/update-flowering")
 def update_flowering(request: UpdateFloweringRequest, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Actualiza una floración existente.
+
+    **Parámetros**:
+    - **request**: Un objeto `UpdateFloweringRequest` que contiene la información de la floración a actualizar.
+        - **flowering_id**: ID de la floración a actualizar.
+        - **harvest_date**: Nueva fecha de cosecha.
+
+    - **session_token**: Token de sesión del usuario.
+
+    - **db**: Sesión de base de datos, se obtiene automáticamente.
+
+    **Respuestas**:
+    - **200 OK**: Floración actualizada correctamente.
+    - **400 Bad Request**: Si no se encuentran los estados necesarios o si las fechas son inválidas.
+    - **401 Unauthorized**: Si el token de sesión es inválido o el usuario no tiene permisos.
+    - **404 Not Found**: Si la floración no existe o no está activa.
+    - **500 Internal Server Error**: Si ocurre un error al intentar actualizar la floración.
+
+    **Ejemplo de respuesta exitosa**:
+    {
+        "status": "success",
+        "message": "Floración actualizada correctamente",
+        "data": {
+            "flowering_id": 1,
+            "plot_id": 10,
+            "flowering_date": "2024-01-01",
+            "harvest_date": "2024-04-01",
+            "status": "Cosechada",
+            "flowering_type_name": "Tipo de floración"
+        }
+    }
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -230,6 +338,43 @@ def update_flowering(request: UpdateFloweringRequest, session_token: str, db: Se
 # Endpoint para obtener recomendaciones (por flowering_id)
 @router.get("/get-recommendations/{flowering_id}")
 def get_recommendations(flowering_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Obtiene recomendaciones basadas en la floración dada.
+
+    **Parámetros**:
+    - **flowering_id**: ID de la floración para la cual se obtendrán recomendaciones.
+    - **session_token**: Token de sesión del usuario.
+
+    - **db**: Sesión de base de datos, se obtiene automáticamente.
+
+    **Respuestas**:
+    - **200 OK**: Recomendaciones obtenidas exitosamente.
+    - **400 Bad Request**: Si no se encuentran los estados necesarios.
+    - **401 Unauthorized**: Si el token de sesión es inválido o el usuario no tiene permisos.
+    - **404 Not Found**: Si la floración no existe o no está activa.
+
+    **Ejemplo de respuesta exitosa**:
+    {
+        "status": "success",
+        "message": "Recomendaciones obtenidas exitosamente",
+        "data": {
+            "recommendations": {
+                "flowering_id": 1,
+                "flowering_type_name": "Tipo de floración",
+                "flowering_date": "2024-01-01",
+                "tasks": [
+                    {
+                        "task": "Detección de enfermedades",
+                        "start_date": "2024-03-01",
+                        "end_date": "2024-03-08",
+                        "programar": "Sí"
+                    },
+                    ...
+                ]
+            }
+        }
+    }
+    """
     # Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
@@ -356,6 +501,38 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
 # Endpoint para obtener floraciones activas
 @router.get("/get-active-flowerings/{plot_id}")
 def get_active_flowerings(plot_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Obtiene las floraciones activas para un lote específico.
+
+    **Parámetros**:
+    - **plot_id**: ID del lote para el cual se obtendrán las floraciones activas.
+    - **session_token**: Token de sesión del usuario.
+    - **db**: Sesión de base de datos, se obtiene automáticamente.
+
+    **Respuestas**:
+    - **200 OK**: Floraciones activas obtenidas correctamente.
+    - **400 Bad Request**: Si los estados necesarios no se encuentran o son inválidos.
+    - **401 Unauthorized**: Si el token de sesión es inválido o el usuario no tiene permisos.
+    - **404 Not Found**: Si el lote no existe o no está activo.
+    - **500 Internal Server Error**: Si ocurre un error al intentar obtener las floraciones.
+
+    **Ejemplo de respuesta exitosa**:
+    {
+        "status": "success",
+        "message": "Floraciones activas obtenidas exitosamente",
+        "data": {
+            "flowerings": [
+                {
+                    "flowering_id": 1,
+                    "flowering_type_name": "Floración Temprana",
+                    "flowering_date": "2024-01-01",
+                    "status": "Activa"
+                },
+                ...
+            ]
+        }
+    }
+    """
     # Verificar el token de sesión y permisos
     user = verify_session_token(session_token, db)
     if not user:
@@ -411,6 +588,39 @@ def get_active_flowerings(plot_id: int, session_token: str, db: Session = Depend
 # Endpoint para obtener el historial de floraciones
 @router.get("/get-flowering-history/{plot_id}")
 def get_flowering_history(plot_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Obtiene el historial de floraciones cosechadas para un lote específico.
+
+    **Parámetros**:
+    - **plot_id**: ID del lote para el cual se obtendrá el historial de floraciones.
+    - **session_token**: Token de sesión del usuario.
+    - **db**: Sesión de base de datos, se obtiene automáticamente.
+
+    **Respuestas**:
+    - **200 OK**: Historial de floraciones obtenido correctamente.
+    - **400 Bad Request**: Si los estados necesarios no se encuentran o son inválidos.
+    - **401 Unauthorized**: Si el token de sesión es inválido o el usuario no tiene permisos.
+    - **404 Not Found**: Si el lote no existe o no está activo.
+    - **500 Internal Server Error**: Si ocurre un error al intentar obtener el historial.
+
+    **Ejemplo de respuesta exitosa**:
+    {
+        "status": "success",
+        "message": "Historial de floraciones obtenido exitosamente",
+        "data": {
+            "flowerings": [
+                {
+                    "flowering_id": 1,
+                    "flowering_type_name": "Floración Temprana",
+                    "flowering_date": "2023-05-01",
+                    "harvest_date": "2023-08-01",
+                    "status": "Cosechada"
+                },
+                ...
+            ]
+        }
+    }
+    """
     # Verificar el token de sesión y permisos
     user = verify_session_token(session_token, db)
     if not user:
@@ -467,6 +677,33 @@ def get_flowering_history(plot_id: int, session_token: str, db: Session = Depend
 # Endpoint para eliminar una floración
 @router.post("/delete-flowering/{flowering_id}")
 def delete_flowering(flowering_id: int, session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Elimina (desactiva) una floración activa.
+
+    **Parámetros**:
+    - **flowering_id**: ID de la floración a eliminar.
+    - **session_token**: Token de sesión del usuario.
+    - **db**: Sesión de base de datos, se obtiene automáticamente.
+
+    **Respuestas**:
+    - **200 OK**: Floración eliminada correctamente.
+    - **400 Bad Request**: Si los estados necesarios no se encuentran o son inválidos.
+    - **401 Unauthorized**: Si el token de sesión es inválido o el usuario no tiene permisos.
+    - **404 Not Found**: Si la floración no existe o no está activa.
+    - **500 Internal Server Error**: Si ocurre un error al intentar eliminar la floración.
+
+    **Ejemplo de respuesta exitosa**:
+    {
+        "status": "success",
+        "message": "Floración eliminada correctamente"
+    }
+
+    **Ejemplo de respuesta de error**:
+    {
+        "status": "error",
+        "message": "No tienes permiso para eliminar esta floración"
+    }
+    """
     # Verificar el token de sesión y permisos
     user = verify_session_token(session_token, db)
     if not user:

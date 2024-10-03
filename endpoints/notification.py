@@ -18,23 +18,33 @@ router = APIRouter()
 
 # Pydantic model para la respuesta de notificación
 class NotificationResponse(BaseModel):
-    notifications_id: int
-    message: Optional[str]
-    date: datetime
-    notification_type: Optional[str]
-    invitation_id: Optional[int]
-    farm_id: Optional[int]
-    reminder_time: Optional[datetime]
-    status: Optional[str]
+    notifications_id: int  # ID de la notificación
+    message: Optional[str]  # Mensaje de la notificación
+    date: datetime  # Fecha de la notificación
+    notification_type: Optional[str]  # Tipo de notificación
+    invitation_id: Optional[int]  # ID de la invitación asociada (si aplica)
+    farm_id: Optional[int]  # ID de la finca asociada (si aplica)
+    reminder_time: Optional[datetime]  # Hora del recordatorio (si aplica)
+    status: Optional[str]  # Estado de la notificación
 
     class Config:
-        from_attributes = True
+        from_attributes = True  # Permitir que los atributos se usen como parámetros de entrada
         json_encoders = {
-            datetime: lambda v: v.isoformat()
+            datetime: lambda v: v.isoformat()  # Serializar fechas en formato ISO
         }
 
 @router.get("/get-notification")
 def get_notifications(session_token: str, db: Session = Depends(get_db_session)):
+    """
+    Endpoint para obtener las notificaciones de un usuario autenticado.
+
+    Parámetros:
+    - session_token: Token de sesión del usuario.
+    - db: Sesión de la base de datos (inyectada automáticamente).
+
+    Retorna:
+    - Respuesta con las notificaciones del usuario.
+    """
     # Verificar el session_token y obtener el usuario autenticado
     user = verify_session_token(session_token, db)
     if not user:
@@ -96,6 +106,18 @@ def create_response(
     data: Optional[Any] = None,
     status_code: int = 200
 ) -> ORJSONResponse:
+    """
+    Crea una respuesta estructurada para el API.
+
+    Parámetros:
+    - status: Estado de la respuesta (ej. "success", "error").
+    - message: Mensaje adicional sobre la respuesta.
+    - data: Datos opcionales a incluir en la respuesta.
+    - status_code: Código de estado HTTP (default es 200).
+
+    Retorna:
+    - Respuesta en formato ORJSONResponse.
+    """
     return ORJSONResponse(
         status_code=status_code,
         content={
@@ -106,6 +128,12 @@ def create_response(
     )
 
 def session_token_invalid_response() -> ORJSONResponse:
+    """
+    Crea una respuesta para el caso en que el token de sesión es inválido.
+
+    Retorna:
+    - Respuesta indicando que las credenciales han expirado.
+    """
     return create_response(
         status="error",
         message="Credenciales expiradas, cerrando sesión.",
