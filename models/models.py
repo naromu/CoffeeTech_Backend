@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, DateTime, Boolean, Date, Sequence, Double
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, DateTime, Boolean, Date, Sequence, Double, CheckConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -541,3 +541,72 @@ class Flowering(Base):
     plot = relationship("Plot")
     status = relationship("Status")
     flowering_type = relationship("FloweringType", back_populates="flowerings")
+    
+    
+class CulturalWork(Base):
+    """
+    Representa una tarea de labor cultural.
+
+    Atributos:
+    ----------
+    cultural_works_id : int
+        Identificador único de la tarea de labor cultural.
+    name : str
+        Nombre de la tarea de labor cultural.
+    description : str
+        Descripción de la tarea de labor cultural.
+    """
+    __tablename__ = 'cultural_works'
+
+    cultural_works_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), nullable=False)
+    description = Column(String(255), nullable=True)
+
+    # Relación con las tareas específicas asignadas a un lote
+    cultural_work_tasks = relationship("CulturalWorkTask", back_populates="cultural_work")
+    
+    
+class CulturalWorkTask(Base):
+    """
+    Representa una tarea de labor cultural asignada a un lote.
+
+    Atributos:
+    ----------
+    cultural_work_tasks_id : int
+        Identificador único de la tarea de labor cultural.
+    cultural_works_id : int
+        Identificador de la tarea cultural específica (relación con CulturalWork).
+    plot_id : int
+        Identificador del lote al cual se asigna la tarea.
+    status : str
+        Estado de la tarea ('Pendiente', 'En progreso', 'Completado').
+    reminder_owner : bool
+        Indica si el propietario debe recibir un recordatorio.
+    reminder_collaborator : bool
+        Indica si el colaborador debe recibir un recordatorio.
+    collaborator_user_id : int
+        Identificador del colaborador asignado a la tarea.
+    owner_user_id : int
+        Identificador del propietario que creó la tarea.
+    """
+    __tablename__ = 'cultural_work_tasks'
+
+    cultural_work_tasks_id = Column(Integer, primary_key=True, index=True)
+    cultural_works_id = Column(Integer, ForeignKey('cultural_works.cultural_works_id'), nullable=False)
+    plot_id = Column(Integer, ForeignKey('plots.plot_id'), nullable=False)
+    status = Column(String(50), nullable=False)
+    reminder_owner = Column(Boolean, nullable=False, default=False)
+    reminder_collaborator = Column(Boolean, nullable=False, default=False)
+    collaborator_user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    owner_user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+
+    # Validación del estado de la tarea
+    __table_args__ = (
+        CheckConstraint(status.in_(['Pendiente', 'En progreso', 'Completado']), name='chk_status'),
+    )
+
+    # Relaciones
+    cultural_work = relationship("CulturalWork", back_populates="cultural_work_tasks")
+    plot = relationship("Plot", back_populates="cultural_work_tasks")
+    collaborator = relationship("User", foreign_keys=[collaborator_user_id], back_populates="assigned_tasks")
+    owner = relationship("User", foreign_keys=[owner_user_id], back_populates="created_tasks")
