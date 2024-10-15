@@ -10,6 +10,7 @@ import logging
 from pydantic import BaseModel, Field
 from datetime import date
 from typing import List, Optional
+from utils.status import get_status
 
 
 
@@ -123,7 +124,11 @@ def create_cultural_work_task(request: CreateCulturalWorkTaskRequest, session_to
 
     # Verificar si la fecha es anterior, igual o futura
     today = date.today()
-    task_status = "Completado" if request.date < today else "Pendiente"
+    pending_status = get_status(db, "Pendiente", "Task")
+    completed_status = get_status(db, "Completado", "Task")
+    # Determinar el estado de la tarea según la fecha
+    task_status = completed_status if request.date < today else pending_status
+
 
     # Verificar que el lote y la labor cultural existan
     plot = db.query(Plot).filter(Plot.plot_id == request.plot_id).first()
