@@ -1,17 +1,8 @@
-import os
-import firebase_admin
-from firebase_admin import credentials, messaging
-from dotenv import load_dotenv
-
-import os
-import firebase_admin
-from firebase_admin import credentials
-from dotenv import load_dotenv
 
 import os
 import json
 import firebase_admin
-from firebase_admin import credentials
+from firebase_admin import credentials, messaging
 from dotenv import load_dotenv
 import tempfile
 
@@ -66,6 +57,7 @@ def send_fcm_notification(fcm_token: str, title: str, body: str):
         ),
         token=fcm_token,
     )
+
 
     # Enviar la notificación
     try:

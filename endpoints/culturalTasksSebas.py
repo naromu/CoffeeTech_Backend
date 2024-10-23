@@ -12,12 +12,9 @@ from datetime import date
 from typing import List, Optional
 from utils.status import get_status
 
-
-
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 router = APIRouter()
 

@@ -10,6 +10,10 @@ from utils.response import session_token_invalid_response
 from utils.response import create_response
 from utils.status import get_status
 from datetime import datetime, date, timedelta
+import pytz
+
+bogota_tz = pytz.timezone("America/Bogota")
+
 
 router = APIRouter()
 
@@ -43,6 +47,17 @@ class UpdateFloweringRequest(BaseModel):
     """
     flowering_id: int
     harvest_date: date
+
+# Helper function to check if flowering is inactive
+def check_flowering_inactive(flowering: Flowering, db: Session):
+    inactive_flowering_status = get_status(db, "Inactivo", "Flowering")
+    if not inactive_flowering_status:
+        logger.error("Estado 'Inactivo' para Flowering no encontrado")
+        raise HTTPException(status_code=500, detail="Estado 'Inactivo' no encontrado en la base de datos")
+    if flowering.status_id == inactive_flowering_status.status_id:
+        logger.info("La floración con ID %s está inactivo", flowering.flowering_id)
+        raise HTTPException(status_code=400, detail="La floración está inactiva")
+
 
 # Endpoint para crear una floración
 @router.post("/create-flowering")
@@ -115,9 +130,11 @@ def create_flowering(request: CreateFloweringRequest, session_token: str, db: Se
     # Obtener estados necesarios
     active_plot_status = get_status(db, "Activo", "Plot")
     active_flowering_status = get_status(db, "Activa", "Flowering")
+    cosechada_flowering_status = get_status(db, "Cosechada", "Flowering")  # Nuevo estado
+
     active_urf_status = get_status(db, "Activo", "user_role_farm")
 
-    if not all([active_plot_status, active_flowering_status, active_urf_status]):
+    if not all([active_plot_status, active_flowering_status,cosechada_flowering_status, active_urf_status]):
         logger.error("No se encontraron los estados necesarios")
         return create_response("error", "Estados necesarios no encontrados", status_code=400)
 
@@ -153,20 +170,23 @@ def create_flowering(request: CreateFloweringRequest, session_token: str, db: Se
         return create_response("error", "No tienes permiso para agregar una floración en esta finca")
 
     # Validaciones de fechas
-    if request.flowering_date > datetime.utcnow().date():
+    flowering_date = request.flowering_date
+    harvest_date = request.harvest_date
+
+    if flowering_date > datetime.now(bogota_tz).date():
         logger.warning("La fecha de floración no puede ser en el futuro")
         return create_response("error", "La fecha de floración no puede ser en el futuro")
 
-    weeks_since_flowering = (datetime.utcnow().date() - request.flowering_date).days / 7
+    weeks_since_flowering = (datetime.now(bogota_tz).date() - flowering_date).days / 7
     if weeks_since_flowering > 33:
         logger.warning("Se pasa de 32 semanas desde la floración hasta la fecha actual")
         return create_response("error", "Su lote ya debió haber sido cosechado, se pasa de 32 semanas desde la floración")
 
-    if request.harvest_date:
-        if request.harvest_date < request.flowering_date:
+    if harvest_date:
+        if harvest_date < flowering_date:
             logger.warning("La fecha de cosecha no puede ser anterior a la fecha de floración")
             return create_response("error", "La fecha de cosecha no puede ser anterior a la fecha de floración")
-        weeks_between_dates = (request.harvest_date - request.flowering_date).days / 7
+        weeks_between_dates = (harvest_date - flowering_date).days / 7
         if weeks_between_dates > 33:
             logger.warning("Se pasa de 32 semanas desde la floración hasta la fecha de cosecha")
             return create_response("error", "Su lote ya debió haber sido cosechado, se pasa de 32 semanas desde la floración")
@@ -174,28 +194,38 @@ def create_flowering(request: CreateFloweringRequest, session_token: str, db: Se
             logger.warning("No han pasado más de 24 semanas desde la floración hasta la fecha de cosecha")
             return create_response("error", "Su lote no puede ser cosechado, tiene menos de 24 semanas desde la floración")
 
-    # Verificar que no exista otra floración activa del mismo tipo en el lote
+    # Verificar que el tipo de floración exista
     flowering_type = db.query(FloweringType).filter(FloweringType.name == request.flowering_type_name).first()
     if not flowering_type:
         logger.warning("El tipo de floración '%s' no existe", request.flowering_type_name)
         return create_response("error", f"El tipo de floración '{request.flowering_type_name}' no existe")
 
-    existing_flowering = db.query(Flowering).filter(
-        Flowering.plot_id == request.plot_id,
-        Flowering.flowering_type_id == flowering_type.flowering_type_id,
-        Flowering.status_id == active_flowering_status.status_id
-    ).first()
-    if existing_flowering:
-        logger.warning("Ya existe una floración activa de tipo '%s' en el lote con ID %s", request.flowering_type_name, request.plot_id)
-        return create_response("error", f"Ya existe una floración activa de tipo '{request.flowering_type_name}' en este lote")
+ # **Nuevo: Verificar si hay una floración activa del mismo tipo en el lote solo si harvest_date no está presente**
+    if not harvest_date:
+        existing_flowering = db.query(Flowering).filter(
+            Flowering.plot_id == request.plot_id,
+            Flowering.flowering_type_id == flowering_type.flowering_type_id,
+            Flowering.status_id == active_flowering_status.status_id
+        ).first()
+        if existing_flowering:
+            logger.warning("Ya existe una floración activa de tipo '%s' en el lote con ID %s", request.flowering_type_name, request.plot_id)
+            return create_response("error", f"Ya existe una floración activa de tipo '{request.flowering_type_name}' en este lote")
+
+    # Determinar el estado de la floración basado en la presencia de harvest_date
+    if harvest_date:
+        flowering_status = cosechada_flowering_status
+        status_name = "Cosechada"
+    else:
+        flowering_status = active_flowering_status
+        status_name = "Activa"
 
     # Crear la floración
     try:
         new_flowering = Flowering(
             plot_id=request.plot_id,
             flowering_date=request.flowering_date,
-            harvest_date=request.harvest_date,
-            status_id=active_flowering_status.status_id,
+            harvest_date=harvest_date,
+            status_id=flowering_status.status_id,
             flowering_type_id=flowering_type.flowering_type_id
         )
         db.add(new_flowering)
@@ -208,7 +238,7 @@ def create_flowering(request: CreateFloweringRequest, session_token: str, db: Se
             "plot_id": new_flowering.plot_id,
             "flowering_date": new_flowering.flowering_date.isoformat(),
             "harvest_date": new_flowering.harvest_date.isoformat() if new_flowering.harvest_date else None,
-            "status": "Activa",
+            "status": status_name,
             "flowering_type_name": flowering_type.name
         })
     except Exception as e:
@@ -262,8 +292,10 @@ def update_flowering(request: UpdateFloweringRequest, session_token: str, db: Se
     active_flowering_status = get_status(db, "Activa", "Flowering")
     harvested_flowering_status = get_status(db, "Cosechada", "Flowering")
     active_urf_status = get_status(db, "Activo", "user_role_farm")
+    inactive_flowering_status = get_status(db, "Inactivo", "Flowering")
 
-    if not all([active_flowering_status, harvested_flowering_status, active_urf_status]):
+
+    if not all([active_flowering_status,inactive_flowering_status, harvested_flowering_status, active_urf_status]):
         logger.error("No se encontraron los estados necesarios")
         return create_response("error", "Estados necesarios no encontrados", status_code=400)
 
@@ -275,6 +307,14 @@ def update_flowering(request: UpdateFloweringRequest, session_token: str, db: Se
     if not flowering:
         logger.warning("La floración con ID %s no existe o no está activa", request.flowering_id)
         return create_response("error", "La floración no existe o no está activa")
+    
+    # Verificar si la floración está inactiva
+    try:
+        check_flowering_inactive(flowering, db)
+    except HTTPException as e:
+        return create_response("error", e.detail, status_code=e.status_code)
+
+
 
     # Obtener el lote y la finca asociada
     plot = db.query(Plot).filter(Plot.plot_id == flowering.plot_id).first()
@@ -384,8 +424,9 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
     # Obtener estados necesarios
     active_flowering_status = get_status(db, "Activa", "Flowering")
     active_urf_status = get_status(db, "Activo", "user_role_farm")
+    inactive_flowering_status = get_status(db, "Inactivo", "Flowering")
 
-    if not all([active_flowering_status, active_urf_status]):
+    if not all([active_flowering_status,inactive_flowering_status, active_urf_status]):
         logger.error("No se encontraron los estados necesarios")
         return create_response("error", "Estados necesarios no encontrados", status_code=400)
 
@@ -398,6 +439,12 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
         logger.warning("La floración con ID %s no existe o no está activa", flowering_id)
         return create_response("error", "La floración no existe o no está activa")
 
+   # Verificar si la floración está inactiva
+    try:
+        check_flowering_inactive(flowering, db)
+    except HTTPException as e:
+        return create_response("error", e.detail, status_code=e.status_code)
+    
     # Obtener el lote y la finca asociada
     plot = db.query(Plot).filter(Plot.plot_id == flowering.plot_id).first()
     if not plot:
@@ -438,7 +485,7 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
     disease_detection_end = flowering_date + timedelta(weeks=17)
     programar = "Sí" if disease_detection_start <= current_date <= disease_detection_end else "No"
     tasks.append({
-        "task": "Detección de enfermedades",
+        "task": "Chequeo de Salud",
         "start_date": disease_detection_start.isoformat(),
         "end_date": disease_detection_end.isoformat(),
         "programar": programar
@@ -449,7 +496,7 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
     pest_detection_end = flowering_date + timedelta(weeks=22)
     programar = "Sí" if pest_detection_start <= current_date <= pest_detection_end else "No"
     tasks.append({
-        "task": "Detección de plagas",
+        "task": "Chequeo de Salud",
         "start_date": pest_detection_start.isoformat(),
         "end_date": pest_detection_end.isoformat(),
         "programar": programar
@@ -460,13 +507,13 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
     nutritional_deficiency_end = nutritional_deficiency_start + timedelta(days=6)
     programar = "Sí" if nutritional_deficiency_start <= current_date <= nutritional_deficiency_end else "No"
     tasks.append({
-        "task": "Detección de deficiencias nutricionales",
+        "task": "Chequeo de Salud",
         "start_date": nutritional_deficiency_start.isoformat(),
         "end_date": nutritional_deficiency_end.isoformat(),
         "programar": programar
     })
 
-    # Fertilización
+    '''# Fertilización
     fertilization_start = nutritional_deficiency_start
     fertilization_end = nutritional_deficiency_end
     programar = "Sí" if fertilization_start <= current_date <= fertilization_end else "No"
@@ -475,7 +522,7 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
         "start_date": fertilization_start.isoformat(),
         "end_date": fertilization_end.isoformat(),
         "programar": programar
-    })
+    })'''
 
     # Detección de estado de maduración
     for week in [26, 28, 30, 32]:
@@ -483,7 +530,7 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
         maturation_end = maturation_start + timedelta(days=6)
         programar = "Sí" if maturation_start <= current_date <= maturation_end else "No"
         tasks.append({
-            "task": f"Detección de estado de maduración (semana {week})",
+            "task": f"Chequeo de estado de maduración (semana {week})",
             "start_date": maturation_start.isoformat(),
             "end_date": maturation_end.isoformat(),
             "programar": programar
@@ -710,7 +757,7 @@ def delete_flowering(flowering_id: int, session_token: str, db: Session = Depend
         return session_token_invalid_response()
 
     active_flowering_status = get_status(db, "Activa", "Flowering")
-    inactive_flowering_status = get_status(db, "Inactiva", "Flowering")
+    inactive_flowering_status = get_status(db, "Inactivo", "Flowering")
     active_urf_status = get_status(db, "Activo", "user_role_farm")
 
     if not all([active_flowering_status, inactive_flowering_status, active_urf_status]):
@@ -724,6 +771,13 @@ def delete_flowering(flowering_id: int, session_token: str, db: Session = Depend
     ).first()
     if not flowering:
         return create_response("error", "La floración no existe o no está activa")
+
+    # Verificar si la floración está inactiva
+    try:
+        check_flowering_inactive(flowering, db)
+    except HTTPException as e:
+        return create_response("error", e.detail, status_code=e.status_code)
+
 
     # Obtener el lote y la finca asociada
     plot = db.query(Plot).filter(Plot.plot_id == flowering.plot_id).first()
