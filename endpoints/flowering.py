@@ -177,10 +177,6 @@ def create_flowering(request: CreateFloweringRequest, session_token: str, db: Se
         logger.warning("La fecha de floración no puede ser en el futuro")
         return create_response("error", "La fecha de floración no puede ser en el futuro")
 
-    weeks_since_flowering = (datetime.now(bogota_tz).date() - flowering_date).days / 7
-    if weeks_since_flowering > 33:
-        logger.warning("Se pasa de 32 semanas desde la floración hasta la fecha actual")
-        return create_response("error", "Su lote ya debió haber sido cosechado, se pasa de 32 semanas desde la floración")
 
     if harvest_date:
         if harvest_date < flowering_date:
@@ -189,10 +185,17 @@ def create_flowering(request: CreateFloweringRequest, session_token: str, db: Se
         weeks_between_dates = (harvest_date - flowering_date).days / 7
         if weeks_between_dates > 33:
             logger.warning("Se pasa de 32 semanas desde la floración hasta la fecha de cosecha")
-            return create_response("error", "Su lote ya debió haber sido cosechado, se pasa de 32 semanas desde la floración")
+            return create_response("error", "Su lote debió ser cosechado mucho antes, se pasa de 32 semanas desde la floración")
         elif weeks_between_dates < 24:
             logger.warning("No han pasado más de 24 semanas desde la floración hasta la fecha de cosecha")
             return create_response("error", "Su lote no puede ser cosechado, tiene menos de 24 semanas desde la floración")
+
+    else:
+        weeks_since_flowering = (datetime.now(bogota_tz).date() - flowering_date).days / 7
+        if weeks_since_flowering > 33:
+            logger.warning("Se pasa de 32 semanas desde la floración hasta la fecha actual")
+            return create_response("error", "Su lote debió ser cosechado mucho antes, se pasa de 32 semanas desde la floración")
+
 
     # Verificar que el tipo de floración exista
     flowering_type = db.query(FloweringType).filter(FloweringType.name == request.flowering_type_name).first()
