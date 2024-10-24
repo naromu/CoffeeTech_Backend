@@ -477,7 +477,7 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
         return create_response("error", "No tienes permiso para ver las recomendaciones de esta floración")
 
     # Calcular recomendaciones para la floración
-    current_date = datetime.utcnow().date()
+    current_date = datetime.now(bogota_tz).date()
     flowering_date = flowering.flowering_date
 
     # Lista de tareas
@@ -543,6 +543,7 @@ def get_recommendations(flowering_id: int, session_token: str, db: Session = Dep
         "flowering_id": flowering.flowering_id,
         "flowering_type_name": flowering.flowering_type.name,
         "flowering_date": flowering.flowering_date.isoformat(),
+        "current_date": current_date.isoformat(),
         "tasks": tasks
     }
 

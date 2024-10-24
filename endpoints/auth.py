@@ -15,6 +15,10 @@ import logging
 from typing import Any, Dict
 from utils.status import get_status
 
+import pytz
+
+bogota_tz = pytz.timezone("America/Bogota")
+
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,7 +64,7 @@ reset_tokens = {}
 # Función auxiliar para verificar tokens
 def verify_user_token(token: str, db: Session) -> User:
     user = db.query(User).filter(User.verification_token == token).first()
-    if not user or (user.token_expiration and user.token_expiration < datetime.datetime.utcnow()):
+    if not user or (user.token_expiration and user.token_expiration < datetime.datetime.now(bogota_tz)):
         return None
     return user
 
@@ -206,7 +210,7 @@ def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db_
         logger.info("Token de restablecimiento generado: %s", reset_token)
 
         # Configura el tiempo de expiración para 15 minutos en el futuro
-        expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+        expiration_time = datetime.datetime.now(bogota_tz) + datetime.timedelta(minutes=15)
         logger.info("Tiempo de expiración del token establecido para: %s", expiration_time)
 
         # Almacenar el token en la base de datos
@@ -284,7 +288,7 @@ Este endpoint permite verificar si un token de restablecimiento de contraseña e
     if token_info:
         logger.info("Token encontrado: %s", request.token)
 
-        current_time = datetime.datetime.utcnow()
+        current_time = datetime.datetime.now(bogota_tz)
         expires_at = token_info['expires_at']
         logger.debug("Hora actual: %s, Expira a: %s", current_time, expires_at)
 
@@ -357,7 +361,7 @@ Este endpoint permite restablecer la contraseña de un usuario, siempre que el t
         logger.info("Token encontrado en memoria: %s", reset.token)
 
         # Verificar si el token ha expirado
-        current_time = datetime.datetime.utcnow()
+        current_time = datetime.datetime.now(bogota_tz)
         expires_at = token_info['expires_at']
         logger.debug("Hora actual: %s, Expira a: %s", current_time, expires_at)
 

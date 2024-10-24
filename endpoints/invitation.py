@@ -16,6 +16,10 @@ from utils.response import session_token_invalid_response
 from utils.status import get_status
 from models.models import NotificationType
 
+import pytz
+
+bogota_tz = pytz.timezone("America/Bogota")
+
 
 from datetime import datetime
 from models.models import Invitation, Notification, Status
@@ -174,7 +178,7 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
             suggested_role=invitation_data.suggested_role,
             farm_id=invitation_data.farm_id,
             inviter_user_id=user.user_id,  # Agregar el ID del usuario que está creando la invitación
-            date=datetime.utcnow()  # Agregar la fecha actual
+            date=datetime.now(bogota_tz)  # Agregar la fecha actual
         )
         db.add(new_invitation)
         db.commit()
@@ -191,7 +195,7 @@ def create_invitation(invitation_data: InvitationCreate, session_token: str, db:
 
         new_notification = Notification(
             message=f"Has sido invitado como {invitation_data.suggested_role} a la finca {farm.name}",
-            date=datetime.utcnow(),
+            date=datetime.now(bogota_tz),
             user_id=existing_user.user_id,
             notification_type_id=invitation_notification_type.notification_type_id,  # Usar notification_type_id
             invitation_id=new_invitation.invitation_id,
@@ -299,7 +303,7 @@ def respond_invitation(invitation_id: int, action: str, session_token: str, db: 
             notification_message = f"El usuario {user.name} ha aceptado tu invitación a la finca {invitation.farm.name}."
             new_notification = Notification(
                 message=notification_message,
-                date=datetime.utcnow(),
+                date=datetime.now(bogota_tz),
                 user_id=invitation.inviter_user_id,
                 notification_type_id=accepted_notification_type.notification_type_id,  # Usar notification_type_id
                 invitation_id=invitation.invitation_id,
@@ -330,7 +334,7 @@ def respond_invitation(invitation_id: int, action: str, session_token: str, db: 
             notification_message = f"El usuario {user.name} ha rechazado tu invitación a la finca {invitation.farm.name}."
             new_notification = Notification(
                 message=notification_message,
-                date=datetime.utcnow(),
+                date=datetime.now(bogota_tz),
                 user_id=invitation.inviter_user_id,
                 notification_type_id=rejected_notification_type.notification_type_id,  # Usar notification_type_id
                 invitation_id=invitation.invitation_id,
