@@ -60,7 +60,7 @@ def get_notifications(session_token: str, db: Session = Depends(get_db_session))
 
     if not notifications:
         logger.info("No hay notificaciones para este usuario.")
-        return create_response("error", "No hay notificaciones para este usuario.", data=[])
+        return create_response("success", "No hay notificaciones para este usuario.", data=[])
 
     # Mostrar las notificaciones obtenidas antes de serializarlas
     for notification in notifications:
