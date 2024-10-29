@@ -506,6 +506,8 @@ def update_cultural_work_task(
     - **404 Not Found**: Si la tarea de labor cultural no existe.
     - **500 Internal Server Error**: Si ocurre un error al intentar actualizar la tarea.
     """
+    current_date = datetime.now(bogota_tz).date()
+
     # 1. Verificar que el session_token esté presente
     if not session_token:
         logger.warning("No se proporcionó el token de sesión en la cabecera")
@@ -709,7 +711,6 @@ def update_cultural_work_task(
                 
                 # Enviar notificación FCM al nuevo colaborador si tiene token y la tarea está pendiente
                 colaborador_nuevo = db.query(User).filter(User.user_id == task.collaborator_user_id).first()
-                current_date = datetime.now(bogota_tz).date()
                 if colaborador_nuevo and colaborador_nuevo.fcm_token and (task.task_date > current_date):
                     send_fcm_notification(
                         colaborador_nuevo.fcm_token,
