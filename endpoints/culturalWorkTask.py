@@ -610,7 +610,7 @@ def update_cultural_work_task(
             # Verificar que el nuevo colaborador tenga el permiso adecuado
             role_permission_colab = db.query(RolePermission).join(Permission).filter(
                 RolePermission.role_id == colaborador_farm.role_id,
-                Permission.name == "assign_cultural_work_task"  # Asegúrate de que este permiso exista
+                Permission.name == "complete_cultural_work_task"  # Asegúrate de que este permiso exista
             ).first()
             if not role_permission_colab:
                 logger.warning(f"El rol {colaborador_farm.role_id} del colaborador no tiene permiso para ser asignado a tareas de labor cultural")
