@@ -54,7 +54,10 @@ class UpdateCulturalWorkTaskRequest(BaseModel):
 # Modelo Pydantic para la solicitud de eliminación de CulturalWorkTask
 class DeleteCulturalWorkTaskRequest(BaseModel):
     cultural_work_task_id: int = Field(..., description="ID de la tarea de labor cultural a eliminar")
-
+    
+class Collaborator(BaseModel):
+    user_id: int
+    name: str
 
 # Endpoint para crear una tarea de labor cultural
 @router.post("/create-cultural-work-task")
@@ -892,3 +895,103 @@ def delete_cultural_work_task(
         db.rollback()
         logger.error(f"Error al eliminar la tarea de labor cultural: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al eliminar la tarea de labor cultural: {str(e)}")
+    
+    
+@router.get("/collaborators-with-complete-permission")
+def get_collaborators_with_complete_permission(
+    plot_id: int,
+    session_token: str,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Obtiene una lista de colaboradores (id y nombre) que tienen el permiso 'complete_cultural_work_task' 
+    y pertenecen a la finca asociada al lote especificado.
+
+    **Parámetros**:
+    - **plot_id**: ID del lote.
+    - **X-Session-Token**: Cabecera que contiene el token de sesión del usuario.
+
+    **Respuestas**:
+    - **200 OK**: Lista de colaboradores obtenida exitosamente.
+    - **400 Bad Request**: Si los parámetros son inválidos o no se encuentran los estados necesarios.
+    - **401 Unauthorized**: Si el token de sesión es inválido o está ausente.
+    - **403 Forbidden**: Si el usuario no está asociado con la finca o no tiene permisos.
+    - **404 Not Found**: Si el lote o la finca no existen.
+    - **500 Internal Server Error**: Si ocurre un error en el servidor.
+    """
+    try:
+        # 1. Verificar que el session_token esté presente
+        if not session_token:
+            logger.warning("No se proporcionó el token de sesión en la solicitud")
+            return create_response("error", "Token de sesión faltante", status_code=401)
+
+        # 2. Verificar el token de sesión
+        user = verify_session_token(session_token, db)
+        if not user:
+            logger.warning("Token de sesión inválido o usuario no encontrado")
+            return session_token_invalid_response()
+
+        # 3. Obtener el lote y la finca asociada
+        active_plot_status = get_status(db, "Activo", "Plot")
+        if not active_plot_status:
+            logger.error("Estado 'Activo' para Plot no encontrado")
+            return create_response("error", "Estado 'Activo' para Plot no encontrado", status_code=400)
+
+        plot = db.query(Plot).filter(
+            Plot.plot_id == plot_id,
+            Plot.status_id == active_plot_status.status_id
+        ).first()
+        if not plot:
+            logger.warning(f"El lote con ID {plot_id} no existe o no está activo")
+            return create_response("error", "El lote no existe o no está activo", status_code=404)
+
+        farm = db.query(Farm).filter(Farm.farm_id == plot.farm_id).first()
+        if not farm:
+            logger.warning(f"La finca asociada al lote con ID {plot_id} no existe")
+            return create_response("error", "La finca asociada al lote no existe", status_code=404)
+
+        # 4. Verificar que el usuario esté asociado con la finca y tenga estado activo
+        active_urf_status = get_status(db, "Activo", "user_role_farm")
+        if not active_urf_status:
+            logger.error("Estado 'Activo' para user_role_farm no encontrado")
+            return create_response("error", "Estado 'Activo' para user_role_farm no encontrado", status_code=400)
+
+        user_role_farm = db.query(UserRoleFarm).filter(
+            UserRoleFarm.user_id == user.user_id,
+            UserRoleFarm.farm_id == farm.farm_id,
+            UserRoleFarm.status_id == active_urf_status.status_id
+        ).first()
+
+        if not user_role_farm:
+            logger.warning(f"El usuario {user.user_id} no está asociado con la finca {farm.farm_id}")
+            return create_response("error", "No tienes permiso para acceder a esta finca", status_code=403)
+
+        # 5. Obtener el permiso 'complete_cultural_work_task'
+        complete_permission = db.query(Permission).filter(Permission.name == "complete_cultural_work_task").first()
+        if not complete_permission:
+            logger.error("Permiso 'complete_cultural_work_task' no encontrado")
+            return create_response("error", "Permiso 'complete_cultural_work_task' no encontrado", status_code=500)
+
+        # 6. Obtener los roles que tienen el permiso 'complete_cultural_work_task'
+        roles_with_permission = db.query(RolePermission.role_id).filter(
+            RolePermission.permission_id == complete_permission.permission_id
+        ).subquery()
+
+        # 7. Consultar los colaboradores que pertenecen a la finca, están activos y tienen el permiso
+        collaborators = db.query(User.user_id, User.name).join(UserRoleFarm, User.user_id == UserRoleFarm.user_id).filter(
+            UserRoleFarm.farm_id == farm.farm_id,
+            UserRoleFarm.status_id == active_urf_status.status_id,
+            UserRoleFarm.role_id.in_(roles_with_permission)
+        ).distinct().all()
+
+        # 8. Preparar la lista de colaboradores
+        collaborators_list = [{"user_id": c.user_id, "name": c.name} for c in collaborators]
+
+        logger.info(f"Se encontraron {len(collaborators_list)} colaboradores con permiso 'complete_cultural_work_task' en la finca {farm.farm_id}")
+
+        # 9. Retornar la respuesta
+        return create_response("success", "Colaboradores obtenidos exitosamente", {"collaborators": collaborators_list})
+
+    except Exception as e:
+        logger.error(f"Error al obtener colaboradores: {str(e)}")
+        return create_response("error", f"Error interno del servidor: {str(e)}", status_code=500)

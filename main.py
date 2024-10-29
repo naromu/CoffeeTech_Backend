@@ -46,8 +46,6 @@ app.include_router(notification.router, prefix="/notification", tags=["Notificac
 # Incluir las rutas de colaboradores
 app.include_router(collaborators.router, prefix="/collaborators", tags=["Collaborators"])
 
-app.include_router(culturalTasksSebas.router, prefix="/culturalTasks", tags=["culturalTasksSebas"])
-
 app.include_router(culturalWorkTask.router, prefix="/culturalWorkTask", tags=["culturalWorkTask"])
 
 
@@ -164,7 +162,7 @@ def send_daily_reminders():
 scheduler = BackgroundScheduler(timezone="America/Bogota")
 
 # Programar la tarea para que se ejecute diariamente a las 5 AM
-scheduler.add_job(send_daily_reminders, CronTrigger(hour=22, minute=5))
+scheduler.add_job(send_daily_reminders, CronTrigger(hour=5, minute=0))
 
 # Iniciar el programador al iniciar la aplicación
 @app.on_event("startup")
