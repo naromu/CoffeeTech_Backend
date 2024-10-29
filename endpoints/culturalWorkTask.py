@@ -40,6 +40,7 @@ class CulturalWorkTaskResponse(BaseModel):
     cultural_work_task_id: int
     cultural_works_name: str
     owner_name: str
+    collaborator_user_id: int  # Nuevo campo añadido
     collaborator_name: str
     status: str
     task_date: date
@@ -387,20 +388,20 @@ def list_cultural_work_tasks(
         status = db.query(Status).filter(Status.status_id == task.status_id).first()
         status_name = status.name if status else "Desconocido"
         
-        # Añadir la tarea a la lista
+        # Añadir la tarea a la lista incluyendo collaborator_user_id
         task_list.append({
             "cultural_work_task_id": task.cultural_work_tasks_id,
             "cultural_works_name": cultural_work_name,
             "owner_name": owner_name,
+            "collaborator_user_id": task.collaborator_user_id,  # Nuevo campo añadido
             "collaborator_name": collaborator_name,
             "status": status_name,
             "task_date": task.task_date.isoformat()  # Convertir date a string
         })
     
-        # Verificar si no hay tareas
+    # Verificar si no hay tareas
     if not task_list:
         return create_response("success", "El lote no tiene tareas creadas", {"tasks": []})
-    
     # Retornar la lista de tareas
     return create_response("success", "Tareas obtenidas exitosamente", {"tasks": task_list})
 
