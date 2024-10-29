@@ -656,7 +656,7 @@ def update_cultural_work_task(
                     if not notification_type_unassign:
                         logger.error("Tipo de notificación 'Asignacion_tarea' no encontrado")
                         return create_response("error", "Tipo de notificación 'Asignacion_tarea' no encontrado", status_code=500)
-                    pending_status_unassign = get_status(db, "Asignacion_tarea", "Notification")
+                    pending_status_unassign = get_status(db, "AsignacionTarea", "Notification")
                     if not pending_status_unassign:
                         logger.error("Estado 'Asignacion_tarea' para Notification no encontrado")
                         return create_response("error", "Estado 'Asignacion_tarea' para Notification no encontrado", status_code=500)
@@ -867,8 +867,8 @@ def delete_cultural_work_task(
         # Opcional: Crear una notificación para el colaborador indicando que la tarea ha sido eliminada
         notification_type = db.query(NotificationType).filter(NotificationType.name == "EliminacionTarea").first()
         if notification_type:
-            # Obtener Status para 'EliminacionTarea' de tipo 'Notification'
-            eliminacion_status = get_status(db, "EliminacionTarea", "Notification")
+            # Obtener Status para 'Inactivo' de tipo 'Notification'
+            eliminacion_status = get_status(db, "Inactivo", "Notification")
             if eliminacion_status:
                 notification_message = f"La tarea de {task.cultural_work.name} en el lote {plot.name} de la finca {farm.name} ha sido eliminada."
                 nueva_notificacion = Notification(
