@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel, Field, constr
 from sqlalchemy.orm import Session
 from models.models import (
-    Transaction, TransactionType, Plot, Farm, User, Status, RolePermission, Permission, UserRoleFarm, Notification, NotificationType
+    TransactionCategory,Transaction, TransactionType, Plot, Farm, User, Status, RolePermission, Permission, UserRoleFarm, Notification, NotificationType
 )
 from utils.security import verify_session_token
 from dataBase import get_db_session
@@ -29,6 +29,8 @@ bogota_tz = pytz.timezone("America/Bogota")
 class CreateTransactionRequest(BaseModel):
     plot_id: int = Field(..., description="ID del lote asociado a la transacción")
     transaction_type_name: str = Field(..., description="Nombre del tipo de transacción")
+    transaction_category_name: str = Field(..., description="Nombre de la categoría de la transacción")
+
     description: Optional[constr(max_length=50)] = Field(None, description="Descripción de la transacción (máximo 50 caracteres)")
     value: float = Field(..., description="Valor de la transacción")
     transaction_date: date = Field(..., description="Fecha de la transacción")
@@ -36,6 +38,7 @@ class CreateTransactionRequest(BaseModel):
 class UpdateTransactionRequest(BaseModel):
     transaction_id: int = Field(..., description="ID de la transacción a actualizar")
     transaction_type_name: Optional[str] = Field(None, description="Nuevo nombre del tipo de transacción")
+    transaction_category_name: Optional[str] = Field(None, description="Nuevo nombre de la categoría de la transacción")
     description: Optional[constr(max_length=50)] = Field(None, description="Nueva descripción de la transacción (máximo 50 caracteres)")
     value: Optional[float] = Field(None, description="Nuevo valor de la transacción")
     transaction_date: Optional[date] = Field(None, description="Nueva fecha de la transacción")
@@ -47,6 +50,8 @@ class TransactionResponse(BaseModel):
     transaction_id: int
     plot_id: int
     transaction_type_name: str
+    transaction_category_name: str  # Nuevo campo
+
     description: Optional[str]
     value: float
     transaction_date: date
@@ -122,17 +127,28 @@ def create_transaction(
         logger.warning("El valor de la transacción debe ser positivo")
         return create_response("error", "El valor de la transacción debe ser positivo", status_code=400)
     
-    # 8. Obtener el estado 'Activo' para Transaction
+     # 8. Verificar que la categoría de transacción existe para el tipo de transacción
+    transaction_category = db.query(TransactionCategory).filter(
+        TransactionCategory.name == request.transaction_category_name,
+        TransactionCategory.transaction_type_id == transaction_type.transaction_type_id
+    ).first()
+    if not transaction_category:
+        logger.warning(f"La categoría de transacción '{request.transaction_category_name}' no existe para el tipo '{request.transaction_type_name}'")
+        return create_response("error", "La categoría de transacción especificada no existe para el tipo de transacción proporcionado", status_code=400)
+    
+    
+    # 9. Obtener el estado 'Activo' para Transaction
     active_status = get_status(db, "Activo", "Transaction")
     if not active_status:
         logger.error("Estado 'Activo' para Transaction no encontrado")
         return create_response("error", "Estado 'Activo' para Transaction no encontrado", status_code=500)
     
-    # 9. Crear la transacción
+    # 10. Crear la transacción
     try:
         new_transaction = Transaction(
             plot_id=request.plot_id,
             transaction_type_id=transaction_type.transaction_type_id,
+            transaction_category_id=transaction_category.transaction_category_id,  # Asignar categoría
             description=request.description,
             value=request.value,
             transaction_date=request.transaction_date,
@@ -148,6 +164,7 @@ def create_transaction(
             transaction_id=new_transaction.transaction_id,
             plot_id=new_transaction.plot_id,
             transaction_type_name=transaction_type.name,
+            transaction_category_name=transaction_category.name,  # Incluir categoría
             description=new_transaction.description,
             value=new_transaction.value,
             transaction_date=new_transaction.transaction_date,
@@ -235,6 +252,19 @@ def edit_transaction(
                 return create_response("error", "El tipo de transacción especificado no existe", status_code=400)
             transaction.transaction_type_id = transaction_type.transaction_type_id
         
+        # Actualizar la categoría de transacción si se proporciona
+        if request.transaction_category_name:
+            # Si el tipo de transacción se ha actualizado en este mismo request, usar el nuevo tipo
+            current_transaction_type_id = request.transaction_type_name and transaction_type.transaction_type_id or transaction.transaction_type_id
+            transaction_category = db.query(TransactionCategory).filter(
+                TransactionCategory.name == request.transaction_category_name,
+                TransactionCategory.transaction_type_id == current_transaction_type_id
+            ).first()
+            if not transaction_category:
+                logger.warning(f"La categoría de transacción '{request.transaction_category_name}' no existe para el tipo de transacción actual")
+                return create_response("error", "La categoría de transacción especificada no existe para el tipo de transacción actual", status_code=400)
+            transaction.transaction_category_id = transaction_category.transaction_category_id
+        
         # Actualizar la descripción si se proporciona
         if request.description is not None:
             if len(request.description) > 50:
@@ -264,10 +294,15 @@ def edit_transaction(
         txn_type = db.query(TransactionType).filter(TransactionType.transaction_type_id == transaction.transaction_type_id).first()
         txn_type_name = txn_type.name if txn_type else "Desconocido"
         
+        # Obtener la categoría de transacción actualizada
+        txn_category = db.query(TransactionCategory).filter(TransactionCategory.transaction_category_id == transaction.transaction_category_id).first()
+        txn_category_name = txn_category.name if txn_category else "Desconocido"
+        
         response_data = TransactionResponse(
             transaction_id=transaction.transaction_id,
             plot_id=transaction.plot_id,
             transaction_type_name=txn_type_name,
+            transaction_category_name=txn_category_name,  # Incluir categoría
             description=transaction.description,
             value=transaction.value,
             transaction_date=transaction.transaction_date,
@@ -438,6 +473,10 @@ def read_transactions(
         txn_type = db.query(TransactionType).filter(TransactionType.transaction_type_id == txn.transaction_type_id).first()
         txn_type_name = txn_type.name if txn_type else "Desconocido"
         
+        # Obtener la categoría de la transacción
+        txn_category = db.query(TransactionCategory).filter(TransactionCategory.transaction_category_id == txn.transaction_category_id).first()
+        txn_category_name = txn_category.name if txn_category else "Desconocido"
+        
         # Obtener el estado de la transacción
         status = db.query(Status).filter(Status.status_id == txn.status_id).first()
         status_name = status.name if status else "Desconocido"
@@ -446,6 +485,7 @@ def read_transactions(
             "transaction_id": txn.transaction_id,
             "plot_id": txn.plot_id,
             "transaction_type_name": txn_type_name,
+            "transaction_category_name": txn_category_name,  # Incluir categoría
             "description": txn.description,
             "value": txn.value,
             "transaction_date": txn.transaction_date.isoformat(),

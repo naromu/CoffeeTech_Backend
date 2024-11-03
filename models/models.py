@@ -623,6 +623,31 @@ class CulturalWorkTask(Base):
     status = relationship("Status")  # Relación con la tabla Status (si existe una tabla llamada Status)
     
     
+# Modelo para TransactionCategory
+class TransactionCategory(Base):
+    """
+    Representa una categoría de transacción en el sistema.
+
+    Atributos:
+    ----------
+    transaction_category_id : int
+        Identificador único de la categoría de transacción.
+    name : str
+        Nombre de la categoría de transacción.
+    transaction_type_id : int
+        Relación con el tipo de transacción.
+    """
+    __tablename__ = 'transaction_category'
+
+    transaction_category_id = Column(Integer, primary_key=True, server_default=Sequence('transaction_category_transaction_category_id_seq').next_value())
+    name = Column(String(50), nullable=False)
+    transaction_type_id = Column(Integer, ForeignKey('transaction_type.transaction_type_id'), nullable=False)
+
+    # Relaciones
+    transaction_type = relationship("TransactionType", back_populates="categories")
+    transactions = relationship("Transaction", back_populates="transaction_category")  # Relación inversa
+
+
     # Modelo para TransactionType
 class TransactionType(Base):
     """
@@ -644,6 +669,7 @@ class TransactionType(Base):
     description = Column(String(255), nullable=True)
 
     # Relaciones
+    categories = relationship("TransactionCategory", back_populates="transaction_type")
     transactions = relationship("Transaction", back_populates="transaction_type")
     
     
@@ -662,6 +688,8 @@ class Transaction(Base):
         Descripción de la transacción.
     transaction_type_id : int
         Relación con el tipo de transacción.
+    transaction_category_id : int
+        Relación con la categoría de la transacción.
     transaction_date : date
         Fecha de la transacción.
     status_id : int
@@ -675,11 +703,13 @@ class Transaction(Base):
     plot_id = Column(Integer, ForeignKey('plot.plot_id'), nullable=False)
     description = Column(String(50), nullable=True)
     transaction_type_id = Column(Integer, ForeignKey('transaction_type.transaction_type_id'), nullable=False)
+    transaction_category_id = Column(Integer, ForeignKey('transaction_category.transaction_category_id'), nullable=False)
     transaction_date = Column(Date, nullable=False)
     status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False)
-    value = Column(Integer, nullable=False)  # Añadido el campo 'value'
+    value = Column(Integer, nullable=False)
 
     # Relaciones
     plot = relationship("Plot")
     transaction_type = relationship("TransactionType", back_populates="transactions")
+    transaction_category = relationship("TransactionCategory")
     status = relationship("Status")
