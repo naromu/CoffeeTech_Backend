@@ -43,6 +43,7 @@ class Farm(Base):
     invitations = relationship("Invitation", back_populates="farm")
     user_roles_farms = relationship('UserRoleFarm', back_populates='farm')
     plots = relationship("Plot", back_populates="farm")
+    historial_detecciones = relationship("HistorialDeteccion", back_populates="farm")
 
 
 # Modelo para UserRoleFarm (relación entre usuarios, roles y fincas)
@@ -242,6 +243,7 @@ class User(Base):
     status = relationship("Status", back_populates="users")
     user_roles_farms = relationship('UserRoleFarm', back_populates='user')
     notifications = relationship("Notification", foreign_keys="[Notification.user_id]", back_populates="user")
+    historial_detecciones = relationship("HistorialDeteccion", back_populates="user")
 
 
 # Modelo para Permission
@@ -440,6 +442,7 @@ class Plot(Base):
     coffee_variety = relationship("CoffeeVariety", back_populates="plots")
 
     cultural_work_tasks = relationship("CulturalWorkTask", back_populates="plot")
+    health_checks = relationship("HealthCheck", back_populates="plot")
 
 # Modelo para CoffeeVariety
 class CoffeeVariety(Base):
@@ -621,6 +624,47 @@ class CulturalWorkTask(Base):
     cultural_work = relationship("CulturalWork", back_populates="cultural_work_tasks")
     plot = relationship("Plot", back_populates="cultural_work_tasks")
     status = relationship("Status")  # Relación con la tabla Status (si existe una tabla llamada Status)
+    
+    
+class HistorialDeteccion(Base):
+    __tablename__ = 'historial_detecciones'
+
+    id = Column(Integer, primary_key=True, index=True, server_default=Sequence('historial_detecciones_id_seq').next_value())
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)  # Suponiendo que el modelo de usuario se llama User
+    plot_id = Column(Integer, ForeignKey('plot.plot_id'), nullable=False)  # Lote relacionado
+    farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)  # Finca relacionada
+    fecha = Column(DateTime, default=datetime.utcnow)  # Fecha de la detección
+
+    # Relaciones
+    user = relationship("User", back_populates="historial_detecciones")  # Ajusta según tu modelo de usuario
+    plot = relationship("Plot", back_populates="historial_detecciones")  # Añadir relación en el modelo de lote
+    farm = relationship("Farm", back_populates="historial_detecciones")  # Añadir relación en el modelo de finca
+    
+class HealthCheck(Base):
+    __tablename__ = 'health_checks'
+
+    health_checks_id = Column(Integer, primary_key=True, index=True)  # Cambié a SERIAL si es necesario
+    check_date = Column(Date, nullable=False)
+    photo_url = Column(String(255), nullable=True)
+    plot_id = Column(Integer, ForeignKey('plot.plot_id'), nullable=False)
+    recommendation_id = Column(Integer, ForeignKey('recommendation.recommendation_id'), nullable=False)
+    prediction = Column(String(50), nullable=False)
+
+    # Relaciones (ajusta según tus modelos)
+    plot = relationship("Plot", back_populates="health_checks")  # Asegúrate de que exista la relación en el modelo Plot
+    recommendation = relationship("Recommendation", back_populates="health_checks")  # Asegúrate de que exista la relación en el modelo Recommendation
+    
+    
+class Recommendation(Base):
+    __tablename__ = 'recommendation'
+
+    recommendation_id = Column(Integer, primary_key=True, index=True)  # Cambié a SERIAL si es necesario
+    recommendation = Column(String(255), nullable=False)
+    name = Column(String(45), nullable=False)
+
+    # Relaciones
+    health_checks = relationship("HealthCheck", back_populates="recommendation")# Asegúrate de que exista la relación en el modelo HealthCheck
+     
     
     
     # Modelo para TransactionType
