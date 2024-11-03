@@ -361,7 +361,7 @@ def delete_transaction(
 @router.get("/list-transactions/{plot_id}")
 def read_transactions(
     plot_id: int,
-    session_token: str = Header(..., alias="X-Session-Token"),
+    session_token: str ,
     db: Session = Depends(get_db_session)
 ):
     # 1. Verificar que el session_token esté presente
