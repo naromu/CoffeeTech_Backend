@@ -358,7 +358,7 @@ def delete_transaction(
         return create_response("error", f"Error al eliminar la transacción: {str(e)}", status_code=500)
 
 # Endpoint to Read Transactions for a Plot
-@router.get("/transactions/{plot_id}")
+@router.get("/list-transactions/{plot_id}")
 def read_transactions(
     plot_id: int,
     session_token: str = Header(..., alias="X-Session-Token"),
