@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,culturalTasksSebas
+from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,transaction
 from dataBase import engine
 from models.models import Base
 from endpoints import culturalWorkTask
@@ -46,8 +46,11 @@ app.include_router(notification.router, prefix="/notification", tags=["Notificac
 # Incluir las rutas de colaboradores
 app.include_router(collaborators.router, prefix="/collaborators", tags=["Collaborators"])
 
+# Incluir las rutas de labores culturales
 app.include_router(culturalWorkTask.router, prefix="/culturalWorkTask", tags=["culturalWorkTask"])
 
+# Incluir las rutas de transacciones
+app.include_router(transaction.router, prefix="/transaction", tags=["transaction"])
 
 
 # Incluir las rutas de farm con prefijo y etiqueta
