@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, DateTime, Boolean, Date, Sequence, Double, CheckConstraint, func 
+from sqlalchemy import Column, Integer,BigInteger, String, Numeric, ForeignKey, DateTime, Boolean, Date, Sequence, Double, CheckConstraint, func 
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -706,7 +706,7 @@ class Transaction(Base):
     transaction_category_id = Column(Integer, ForeignKey('transaction_category.transaction_category_id'), nullable=False)
     transaction_date = Column(Date, nullable=False)
     status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False)
-    value = Column(Integer, nullable=False)
+    value = Column(BigInteger, nullable=False)
 
     # Relaciones
     plot = relationship("Plot")

@@ -32,7 +32,7 @@ class CreateTransactionRequest(BaseModel):
     transaction_category_name: str = Field(..., description="Nombre de la categoría de la transacción")
 
     description: Optional[constr(max_length=50)] = Field(None, description="Descripción de la transacción (máximo 50 caracteres)")
-    value: float = Field(..., description="Valor de la transacción")
+    value: int = Field(..., description="Valor de la transacción")
     transaction_date: date = Field(..., description="Fecha de la transacción")
 
 class UpdateTransactionRequest(BaseModel):
@@ -40,7 +40,7 @@ class UpdateTransactionRequest(BaseModel):
     transaction_type_name: Optional[str] = Field(None, description="Nuevo nombre del tipo de transacción")
     transaction_category_name: Optional[str] = Field(None, description="Nuevo nombre de la categoría de la transacción")
     description: Optional[constr(max_length=50)] = Field(None, description="Nueva descripción de la transacción (máximo 50 caracteres)")
-    value: Optional[float] = Field(None, description="Nuevo valor de la transacción")
+    value: Optional[int] = Field(None, description="Nuevo valor de la transacción")
     transaction_date: Optional[date] = Field(None, description="Nueva fecha de la transacción")
 
 class DeleteTransactionRequest(BaseModel):
@@ -53,7 +53,7 @@ class TransactionResponse(BaseModel):
     transaction_category_name: str  # Nuevo campo
 
     description: Optional[str]
-    value: float
+    value: int
     transaction_date: date
     status: str
 
