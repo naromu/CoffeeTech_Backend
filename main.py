@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,transaction
+from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,transaction,reports
 from dataBase import engine
 from models.models import Base
 from endpoints import culturalWorkTask
@@ -52,6 +52,7 @@ app.include_router(culturalWorkTask.router, prefix="/culturalWorkTask", tags=["c
 # Incluir las rutas de transacciones
 app.include_router(transaction.router, prefix="/transaction", tags=["transaction"])
 
+app.include_router(reports.router, prefix="/reports", tags=["Reports"])
 
 # Incluir las rutas de farm con prefijo y etiqueta
 
