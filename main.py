@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,transaction,reports
+from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,culturalTasksSebas, detection
+from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,transaction
 from dataBase import engine
 from models.models import Base
 from endpoints import culturalWorkTask
@@ -13,6 +14,7 @@ from utils.FCM import send_fcm_notification
 from datetime import datetime, timedelta
 import pytz
 import logging
+
 
 # Crear todas las tablas
 Base.metadata.create_all(bind=engine)
@@ -48,6 +50,10 @@ app.include_router(collaborators.router, prefix="/collaborators", tags=["Collabo
 
 # Incluir las rutas de labores culturales
 app.include_router(culturalWorkTask.router, prefix="/culturalWorkTask", tags=["culturalWorkTask"])
+
+# Incluir las rutas de deteccion de maduracion con prefijo y etiqueta
+app.include_router(detection.router, prefix="/detection", tags=["Detections"])
+
 
 # Incluir las rutas de transacciones
 app.include_router(transaction.router, prefix="/transaction", tags=["transaction"])

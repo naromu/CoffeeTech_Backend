@@ -576,29 +576,6 @@ class CulturalWork(Base):
 class CulturalWorkTask(Base):
     """
     Representa una tarea de labor cultural asignada a un lote.
-
-    Atributos:
-    ----------
-    cultural_work_tasks_id : int
-        Identificador único de la tarea de labor cultural (autoincrementable).
-    cultural_works_id : int
-        Identificador de la tarea cultural específica (relación con CulturalWork).
-    plot_id : int
-        Identificador del lote (plot) asignado a la tarea (relación con Plot).
-    status_id : int
-        Identificador del estado de la tarea (relación con Status).
-    reminder_owner : bool
-        Indica si el propietario debe recibir un recordatorio.
-    reminder_collaborator : bool
-        Indica si el colaborador debe recibir un recordatorio.
-    collaborator_user_id : int
-        Identificador del colaborador asignado a la tarea.
-    owner_user_id : int
-        Identificador del propietario que creó la tarea.
-    created_at : datetime
-        Fecha y hora de creación del registro (para auditoría).
-    task_date : date
-        Fecha asociada a la tarea (diferente de la fecha de creación).
     """
     __tablename__ = 'cultural_work_tasks'
 
@@ -610,17 +587,45 @@ class CulturalWorkTask(Base):
     reminder_collaborator = Column(Boolean, nullable=False, default=False)
     collaborator_user_id = Column(Integer, nullable=False)
     owner_user_id = Column(Integer, nullable=False)
-
-    # Columna de auditoría para la fecha y hora de creación
     created_at = Column(DateTime(timezone=True), nullable=False, default=get_colombia_time)
-
-    # Columna de fecha para la tarea (sin hora)
     task_date = Column(Date, nullable=True)
 
     # Relaciones
     cultural_work = relationship("CulturalWork", back_populates="cultural_work_tasks")
     plot = relationship("Plot", back_populates="cultural_work_tasks")
-    status = relationship("Status")  # Relación con la tabla Status (si existe una tabla llamada Status)
+    status = relationship("Status")
+    health_checks = relationship("HealthCheck", back_populates="cultural_work_task")
+
+
+
+
+    
+
+class HealthCheck(Base):
+    __tablename__ = 'health_checks'
+
+    health_checks_id = Column(Integer, primary_key=True, index=True)
+    check_date = Column(Date, nullable=False)
+    recommendation_id = Column(Integer, ForeignKey('recommendation.recommendation_id'), nullable=False)
+    prediction = Column(String(50), nullable=False)
+    cultural_work_tasks_id = Column(Integer, ForeignKey('cultural_work_tasks.cultural_work_tasks_id'), nullable=False)
+
+    # Relaciones
+    recommendation = relationship("Recommendation", back_populates="health_checks")
+    cultural_work_task = relationship("CulturalWorkTask", back_populates="health_checks")
+
+    
+    
+class Recommendation(Base):
+    __tablename__ = 'recommendation'
+
+    recommendation_id = Column(Integer, primary_key=True, index=True)  # Cambié a SERIAL si es necesario
+    recommendation = Column(String(255), nullable=False)
+    name = Column(String(45), nullable=False)
+
+    # Relaciones
+    health_checks = relationship("HealthCheck", back_populates="recommendation")# Asegúrate de que exista la relación en el modelo HealthCheck
+     
     
     
 # Modelo para TransactionCategory
