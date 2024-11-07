@@ -9,9 +9,9 @@ import io
 import base64
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers, models
-from tensorflow.keras.applications.vgg16 import preprocess_input as preprocess_input_vgg
-from tensorflow.keras.applications.mobilenet import preprocess_input as preprocess_input_mobilenet
+from keras import layers, models
+from keras.applications.vgg16 import preprocess_input as preprocess_input_vgg
+from keras.applications.mobilenet import preprocess_input as preprocess_input_mobilenet
 import onnxruntime as ort
 import traceback
 import cv2 
