@@ -43,7 +43,6 @@ class Farm(Base):
     invitations = relationship("Invitation", back_populates="farm")
     user_roles_farms = relationship('UserRoleFarm', back_populates='farm')
     plots = relationship("Plot", back_populates="farm")
-    historial_detecciones = relationship("HistorialDeteccion", back_populates="farm")
 
 
 # Modelo para UserRoleFarm (relación entre usuarios, roles y fincas)
@@ -243,7 +242,6 @@ class User(Base):
     status = relationship("Status", back_populates="users")
     user_roles_farms = relationship('UserRoleFarm', back_populates='user')
     notifications = relationship("Notification", foreign_keys="[Notification.user_id]", back_populates="user")
-    historial_detecciones = relationship("HistorialDeteccion", back_populates="user")
 
 
 # Modelo para Permission
@@ -442,7 +440,6 @@ class Plot(Base):
     coffee_variety = relationship("CoffeeVariety", back_populates="plots")
 
     cultural_work_tasks = relationship("CulturalWorkTask", back_populates="plot")
-    health_checks = relationship("HealthCheck", back_populates="plot")
 
 # Modelo para CoffeeVariety
 class CoffeeVariety(Base):
@@ -579,29 +576,6 @@ class CulturalWork(Base):
 class CulturalWorkTask(Base):
     """
     Representa una tarea de labor cultural asignada a un lote.
-
-    Atributos:
-    ----------
-    cultural_work_tasks_id : int
-        Identificador único de la tarea de labor cultural (autoincrementable).
-    cultural_works_id : int
-        Identificador de la tarea cultural específica (relación con CulturalWork).
-    plot_id : int
-        Identificador del lote (plot) asignado a la tarea (relación con Plot).
-    status_id : int
-        Identificador del estado de la tarea (relación con Status).
-    reminder_owner : bool
-        Indica si el propietario debe recibir un recordatorio.
-    reminder_collaborator : bool
-        Indica si el colaborador debe recibir un recordatorio.
-    collaborator_user_id : int
-        Identificador del colaborador asignado a la tarea.
-    owner_user_id : int
-        Identificador del propietario que creó la tarea.
-    created_at : datetime
-        Fecha y hora de creación del registro (para auditoría).
-    task_date : date
-        Fecha asociada a la tarea (diferente de la fecha de creación).
     """
     __tablename__ = 'cultural_work_tasks'
 
@@ -613,46 +587,33 @@ class CulturalWorkTask(Base):
     reminder_collaborator = Column(Boolean, nullable=False, default=False)
     collaborator_user_id = Column(Integer, nullable=False)
     owner_user_id = Column(Integer, nullable=False)
-
-    # Columna de auditoría para la fecha y hora de creación
     created_at = Column(DateTime(timezone=True), nullable=False, default=get_colombia_time)
-
-    # Columna de fecha para la tarea (sin hora)
     task_date = Column(Date, nullable=True)
 
     # Relaciones
     cultural_work = relationship("CulturalWork", back_populates="cultural_work_tasks")
     plot = relationship("Plot", back_populates="cultural_work_tasks")
-    status = relationship("Status")  # Relación con la tabla Status (si existe una tabla llamada Status)
-    
-    
-class HistorialDeteccion(Base):
-    __tablename__ = 'historial_detecciones'
+    status = relationship("Status")
+    health_checks = relationship("HealthCheck", back_populates="cultural_work_task")
 
-    id = Column(Integer, primary_key=True, index=True, server_default=Sequence('historial_detecciones_id_seq').next_value())
-    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)  # Suponiendo que el modelo de usuario se llama User
-    plot_id = Column(Integer, ForeignKey('plot.plot_id'), nullable=False)  # Lote relacionado
-    farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=False)  # Finca relacionada
-    fecha = Column(DateTime, default=datetime.utcnow)  # Fecha de la detección
 
-    # Relaciones
-    user = relationship("User", back_populates="historial_detecciones")  # Ajusta según tu modelo de usuario
-    plot = relationship("Plot", back_populates="historial_detecciones")  # Añadir relación en el modelo de lote
-    farm = relationship("Farm", back_populates="historial_detecciones")  # Añadir relación en el modelo de finca
+
+
     
+
 class HealthCheck(Base):
     __tablename__ = 'health_checks'
 
-    health_checks_id = Column(Integer, primary_key=True, index=True)  # Cambié a SERIAL si es necesario
+    health_checks_id = Column(Integer, primary_key=True, index=True)
     check_date = Column(Date, nullable=False)
-    photo_url = Column(String(255), nullable=True)
-    plot_id = Column(Integer, ForeignKey('plot.plot_id'), nullable=False)
     recommendation_id = Column(Integer, ForeignKey('recommendation.recommendation_id'), nullable=False)
     prediction = Column(String(50), nullable=False)
+    cultural_work_tasks_id = Column(Integer, ForeignKey('cultural_work_tasks.cultural_work_tasks_id'), nullable=False)
 
-    # Relaciones (ajusta según tus modelos)
-    plot = relationship("Plot", back_populates="health_checks")  # Asegúrate de que exista la relación en el modelo Plot
-    recommendation = relationship("Recommendation", back_populates="health_checks")  # Asegúrate de que exista la relación en el modelo Recommendation
+    # Relaciones
+    recommendation = relationship("Recommendation", back_populates="health_checks")
+    cultural_work_task = relationship("CulturalWorkTask", back_populates="health_checks")
+
     
     
 class Recommendation(Base):
