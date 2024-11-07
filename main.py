@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,culturalTasksSebas, detection
-from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,transaction
+from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,transaction, reports
 from dataBase import engine
 from models.models import Base
 from endpoints import culturalWorkTask
