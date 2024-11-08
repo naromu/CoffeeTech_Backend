@@ -1,9 +1,9 @@
 from fastapi import FastAPI
-from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,culturalTasksSebas, detection
-from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,transaction, reports
+from endpoints import auth, utils, farm ,invitation,notification,collaborators,plots,flowering,transaction,reports,detection
 from dataBase import engine
 from models.models import Base
 from endpoints import culturalWorkTask
+import os
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 import pytz
 import logging
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 
 # Crear todas las tablas
 Base.metadata.create_all(bind=engine)
@@ -23,6 +25,30 @@ app = FastAPI()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+saved_model_path_vgg = "modelsIA/Modelo-Enfermedades"
+saved_model_path_def = "modelsIA/Modelo-Deficiencias"
+onnx_model_path = 'modelsIA/Modelo-EstadosMaduracion/best.onnx'
+
+if not os.path.exists(saved_model_path_vgg):
+    logger.warning(f"El modelo VGG no se encuentra en la ruta: {saved_model_path_vgg}")
+else:
+    logger.warning(f"El modelo VGG existe en la ruta: {saved_model_path_vgg}")
+
+
+# Verificar modelo de deficiencias
+if not os.path.exists(saved_model_path_def):
+    logger.warning(f"El modelo de deficiencias no se encuentra en la ruta: {saved_model_path_def}")
+else:
+    logger.warning(f"El modelo de deficiencias existe en la ruta: {saved_model_path_def}")
+
+# Verificar modelo ONNX
+if not os.path.exists(onnx_model_path):
+    logger.warning(f"El modelo ONNX no se encuentra en la ruta: {onnx_model_path}")
+else:
+    logger.warning(f"El modelo ONNX existe en la ruta: {onnx_model_path}")
+
 
 # Incluir las rutas de auth con prefijo y etiqueta
 app.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
@@ -51,14 +77,12 @@ app.include_router(collaborators.router, prefix="/collaborators", tags=["Collabo
 # Incluir las rutas de labores culturales
 app.include_router(culturalWorkTask.router, prefix="/culturalWorkTask", tags=["culturalWorkTask"])
 
-# Incluir las rutas de deteccion de maduracion con prefijo y etiqueta
-app.include_router(detection.router, prefix="/detection", tags=["Detections"])
-
-
 # Incluir las rutas de transacciones
 app.include_router(transaction.router, prefix="/transaction", tags=["transaction"])
 
 app.include_router(reports.router, prefix="/reports", tags=["Reports"])
+
+app.include_router(detection.router, prefix="/detection", tags=["Detection"])
 
 # Incluir las rutas de farm con prefijo y etiqueta
 
