@@ -518,36 +518,47 @@ def detect_maturity(
                         global_class_count[class_name] += 1
     
             # Obtener la predicción final para esta imagen (opcional)
+            # Obtener la predicción final para esta imagen
             if class_count:
                 predicted_class_image = max(class_count, key=class_count.get)
             else:
-                predicted_class_image = "Sin detección"
-    
-    
+                predicted_class_image = "No hay granos"
+
             # Ordenar las clases por un orden predefinido de aparición
-            ordered_class_names = ["Verde", "Pintón", "Maduro", "Sobremaduro"]
+            ordered_class_names = ["Verde", "Pintón", "Maduro", "Sobremaduro", "No hay granos"]
 
             # Construir el texto de predicción ordenado
-            prediction_text = ', '.join([f"{class_name} = {global_class_count[class_name]}" for class_name in ordered_class_names if global_class_count[class_name] > 0])
+            prediction_text = ', '.join([
+                f"{class_name} = {global_class_count[class_name]}" 
+                for class_name in ordered_class_names 
+                if global_class_count.get(class_name, 0) > 0
+            ]) or "No hay granos"
 
-
-            # Obtener la recomendación para esta imagen (opcional)
+            # Obtener la recomendación para esta imagen
             recommendation = db.query(Recommendation).filter(Recommendation.name == predicted_class_image).first()
-            recommendation_text = recommendation.recommendation if recommendation else "No se encontró una recomendación para esta clase."
-    
+
+            if not recommendation:
+                logger.error(f"No se encontró una recomendación para la clase '{predicted_class_image}'.")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"No se encontró una recomendación para la clase '{predicted_class_image}'. Contacta al administrador."
+                )
+
+            recommendation_text = recommendation.recommendation
+
             # Crear una instancia de HealthCheck con estado 'Pendiente'
             new_health_check = HealthCheck(
                 check_date=datetime.utcnow(),
                 cultural_work_tasks_id=request.cultural_work_tasks_id,
-                recommendation_id=recommendation.recommendation_id if recommendation else None,
+                recommendation_id=recommendation.recommendation_id,  # Garantizado que no es None
                 prediction=prediction_text,
                 status_id=Pendiente_status_id  # Estado 'Pendiente'
             )
-    
+
             # Agregar a la sesión de la base de datos
             db.add(new_health_check)
             db.flush()  # Obtener el ID sin hacer commit aún
-            
+
             # Agregar al response (opcional)
             response_data.append({
                 "prediction_id": new_health_check.health_checks_id,  # ID de la predicción
@@ -556,6 +567,7 @@ def detect_maturity(
                 "recomendacion": recommendation_text
             })
             image_number += 1
+
         except Exception as e:
             logger.error(f"Error procesando la imagen {image_number}: {str(e)}")
             logger.debug(traceback.format_exc())
