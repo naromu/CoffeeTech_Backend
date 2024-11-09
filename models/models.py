@@ -596,25 +596,29 @@ class CulturalWorkTask(Base):
     status = relationship("Status")
     health_checks = relationship("HealthCheck", back_populates="cultural_work_task")
 
-
-
-
-    
-
 class HealthCheck(Base):
     __tablename__ = 'health_checks'
 
-    health_checks_id = Column(Integer, primary_key=True, index=True)
-    check_date = Column(Date, nullable=False)
+    health_checks_id = Column(Integer, primary_key=True, index=True, server_default=Sequence('health_checks_id_seq').next_value())
+    check_date = Column(Date, nullable=False, default=datetime.utcnow)
     recommendation_id = Column(Integer, ForeignKey('recommendation.recommendation_id'), nullable=False)
     prediction = Column(String(50), nullable=False)
     cultural_work_tasks_id = Column(Integer, ForeignKey('cultural_work_tasks.cultural_work_tasks_id'), nullable=False)
+    
+    # Nueva columna status_id con clave foránea a la tabla status
+    status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False, default=35)
 
     # Relaciones
     recommendation = relationship("Recommendation", back_populates="health_checks")
     cultural_work_task = relationship("CulturalWorkTask", back_populates="health_checks")
+    status = relationship("Status")
 
-    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.status_id:
+            # Asigna el status_id predeterminado si no se proporciona
+            self.status_id = 35  # 'pendiente_deteccion'
+
     
 class Recommendation(Base):
     __tablename__ = 'recommendation'
