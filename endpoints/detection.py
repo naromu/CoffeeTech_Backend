@@ -1,7 +1,4 @@
 # routers/predictions.py
-
-import sys
-import os
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -21,9 +18,8 @@ from PIL import Image, ImageDraw
 import numpy as np
 import onnxruntime as ort
 import traceback
-import torch
 from utils.FCM import send_fcm_notification
-import cv2
+
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO)
@@ -68,7 +64,7 @@ class DeactivatePredictionsRequest(BaseModel):
 router = APIRouter()
 
 # Diccionarios de clases y colores para maduración
-class_names_maturity = {0: "overripe", 1: "ripe", 2: "semi_ripe", 3: "unripe"}
+class_names_maturity = {0: "Sobremaduro", 1: "Maduro", 2: "Pintón", 3: "Verde"}
 class_colors_maturity = {0: (0, 165, 255), 1: (0, 0, 255), 2: (255, 255, 0), 3: (0, 255, 0)}
 
 # Diccionarios de nombres de clases y colores para enfermedades y deficiencias
@@ -527,6 +523,14 @@ def detect_maturity(
             else:
                 predicted_class_image = "Sin detección"
     
+    
+            # Ordenar las clases por un orden predefinido de aparición
+            ordered_class_names = ["Verde", "Pintón", "Maduro", "Sobremaduro"]
+
+            # Construir el texto de predicción ordenado
+            prediction_text = ', '.join([f"{class_name} = {global_class_count[class_name]}" for class_name in ordered_class_names if global_class_count[class_name] > 0])
+
+
             # Obtener la recomendación para esta imagen (opcional)
             recommendation = db.query(Recommendation).filter(Recommendation.name == predicted_class_image).first()
             recommendation_text = recommendation.recommendation if recommendation else "No se encontró una recomendación para esta clase."
@@ -536,7 +540,7 @@ def detect_maturity(
                 check_date=datetime.utcnow(),
                 cultural_work_tasks_id=request.cultural_work_tasks_id,
                 recommendation_id=recommendation.recommendation_id if recommendation else None,
-                prediction=predicted_class_image,
+                prediction=prediction_text,
                 status_id=Pendiente_status_id  # Estado 'Pendiente'
             )
     
@@ -548,7 +552,7 @@ def detect_maturity(
             response_data.append({
                 "prediction_id": new_health_check.health_checks_id,  # ID de la predicción
                 "imagen_numero": image_number,
-                "prediccion": predicted_class_image,
+                "prediccion": prediction_text,
                 "recomendacion": recommendation_text
             })
             image_number += 1
@@ -584,8 +588,7 @@ def detect_maturity(
         "success",
         "Detecciones de maduración procesadas exitosamente",
         data={
-            "detalles_por_imagen": response_data,  # Opcional: detalles por cada imagen
-            "resumen": summary
+            "detalles_por_imagen": response_data  # Opcional: detalles por cada imagen
         },
         status_code=200
     )
@@ -599,59 +602,90 @@ def accept_predictions(
     db: Session = Depends(get_db_session)
 ):
     """
-    Aceptar predicciones previamente generadas y actualizarlas a estado 'accepted'.
+    Aceptar predicciones previamente generadas y actualizarlas a estado 'Aceptado'.
+    Además, cambiar el estado de la tarea de labor cultural asociada a 'Terminado'.
     """
     # 1. Verificar que el session_token esté presente
     if not session_token:
         logger.warning("No se proporcionó el token de sesión en la cabecera")
         return create_response("error", "Token de sesión faltante", status_code=401)
-    
+
     # 2. Verificar el token de sesión
     user = verify_session_token(session_token, db)
     if not user:
         logger.warning("Token de sesión inválido o usuario no encontrado")
         return session_token_invalid_response()
-    
+
     # 3. Validar que prediction_ids no esté vacío
     if not request.prediction_ids:
         logger.warning("No se proporcionaron IDs de predicciones para aceptar")
         return create_response("error", "Lista de IDs de predicciones vacía", status_code=400)
-    
+
     # 4. Obtener las predicciones de la base de datos
     predictions = db.query(HealthCheck).filter(HealthCheck.health_checks_id.in_(request.prediction_ids)).all()
-    
-    # 5. Verificar que todas las predicciones existen y están en estado 'Pendiente'
+
+    # 5. Obtener el status_id para 'Pendiente' del tipo 'Deteccion'
+    pendiente_status_id = get_status_id(db, "Pendiente", "Deteccion")
+    if not pendiente_status_id:
+        logger.error("No se encontró el status_id para 'Pendiente' de tipo 'Deteccion'")
+        return create_response("error", "Estado 'Pendiente' no configurado en el sistema", status_code=500)
+
+    # 6. Verificar que todas las predicciones existen y están en estado 'Pendiente'
     if len(predictions) != len(request.prediction_ids):
         logger.warning("Algunas predicciones no existen")
         return create_response("error", "Algunas predicciones no existen", status_code=404)
-    
+
     for prediction in predictions:
-        if prediction.status_id != 35:  # 35 = 'Pendiente'
+        if prediction.status_id != pendiente_status_id:
             logger.warning(f"La predicción con ID {prediction.health_checks_id} no está en estado 'Pendiente'")
             return create_response("error", f"La predicción con ID {prediction.health_checks_id} no está en estado 'Pendiente'", status_code=400)
-    
-    # 6. Obtener el status_id para 'accepted' del tipo 'Deteccion'
+
+    # 7. Obtener el status_id para 'Aceptado' del tipo 'Deteccion'
     accepted_status_id = get_status_id(db, "Aceptado", "Deteccion")
     if not accepted_status_id:
-        logger.error("No se encontró el status_id para 'accepted' de tipo 'Deteccion'")
-        return create_response("error", "Estado 'accepted' no configurado en el sistema", status_code=500)
-    
-    # 7. Actualizar el estado de las predicciones a 'accepted'
+        logger.error("No se encontró el status_id para 'Aceptado' de tipo 'Deteccion'")
+        return create_response("error", "Estado 'Aceptado' no configurado en el sistema", status_code=500)
+
+    # 8. Obtener el status_id para 'Terminado' del tipo 'Task'
+    terminado_status_id = get_status_id(db, "Terminado", "Task")
+    if not terminado_status_id:
+        logger.error("No se encontró el status_id para 'Terminado' de tipo 'Task'")
+        return create_response("error", "Estado 'Terminado' no configurado en el sistema", status_code=500)
+
+    # 9. Actualizar el estado de las predicciones y las tareas culturales a 'Aceptado' y 'Terminado'
     try:
+        # Actualizar HealthCheck status
         for prediction in predictions:
             prediction.status_id = accepted_status_id
             # Si hay acciones adicionales al aceptar, como enviar notificaciones, realizarlas aquí
+
+        # Obtener unique cultural_work_tasks_id
+        task_ids = set(pred.cultural_work_tasks_id for pred in predictions)
+
+        # Actualizar CulturalWorkTask status
+        for task_id in task_ids:
+            cultural_work_task = db.query(CulturalWorkTask).filter(
+                CulturalWorkTask.cultural_work_tasks_id == task_id
+            ).first()
+            if cultural_work_task:
+                cultural_work_task.status_id = terminado_status_id
+            else:
+                logger.warning(f"CulturalWorkTask con ID {task_id} no encontrada")
+                return create_response("error", f"Tarea cultural con ID {task_id} no encontrada", status_code=404)
+
+        # Commit both updates
         db.commit()
     except Exception as e:
-        logger.error(f"Error actualizando el estado de las predicciones: {str(e)}")
+        logger.error(f"Error actualizando las predicciones o las tareas culturales: {str(e)}")
         logger.debug(traceback.format_exc())
         db.rollback()
-        return create_response("error", "Error al aceptar las predicciones", status_code=500)
-    
-    return create_response("success", "Predicciones aceptadas exitosamente", status_code=200)
+        return create_response("error", "Error al aceptar las predicciones y actualizar las tareas culturales", status_code=500)
+
+    return create_response("success", "Predicciones aceptadas y tareas culturales actualizadas exitosamente", status_code=200)
 
 
-@router.post("/unaccept-detection")
+
+@router.post("/discard-detection")
 def unaccept_predictions(
     request: UnacceptPredictionsRequest,
     session_token: str,
