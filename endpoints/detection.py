@@ -725,21 +725,16 @@ def unaccept_predictions(
     # 4. Obtener las predicciones de la base de datos
     predictions = db.query(HealthCheck).filter(HealthCheck.health_checks_id.in_(request.prediction_ids)).all()
     
-    # 5. Verificar que todas las predicciones existen y están en estado 'accepted'
+    # 5. Verificar que todas las predicciones existen y están en estado 'Descartado'
     if len(predictions) != len(request.prediction_ids):
         logger.warning("Algunas predicciones no existen")
         return create_response("error", "Algunas predicciones no existen", status_code=404)
     
-    # Obtener el status_id para 'accepted' del tipo 'detection'
-    accepted_status_id = get_status_id(db, "accepted", "detection")
+    # Obtener el status_id para 'accepted' del tipo 'Deteccion'
+    accepted_status_id = get_status_id(db, "Descartado", "Deteccion")
     if not accepted_status_id:
-        logger.error("No se encontró el status_id para 'accepted' de tipo 'detection'")
-        return create_response("error", "Estado 'accepted' no configurado en el sistema", status_code=500)
-    
-    for prediction in predictions:
-        if prediction.status_id != accepted_status_id:
-            logger.warning(f"La predicción con ID {prediction.health_checks_id} no está en estado 'accepted'")
-            return create_response("error", f"La predicción con ID {prediction.health_checks_id} no está en estado 'accepted'", status_code=400)
+        logger.error("No se encontró el status_id para 'Descartado' de tipo 'Deteccion'")
+        return create_response("error", "Estado 'Descartado' no configurado en el sistema", status_code=500)
     
     # 6. Eliminar las predicciones de la base de datos
     try:
