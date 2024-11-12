@@ -24,7 +24,6 @@ class NotificationResponse(BaseModel):
     notification_type: Optional[str]  # Tipo de notificación
     invitation_id: Optional[int]  # ID de la invitación asociada (si aplica)
     farm_id: Optional[int]  # ID de la finca asociada (si aplica)
-    reminder_time: Optional[datetime]  # Hora del recordatorio (si aplica)
     status: Optional[str]  # Estado de la notificación
 
     class Config:
@@ -83,7 +82,6 @@ def get_notifications(session_token: str, db: Session = Depends(get_db_session))
                 notification_type=notification.notification_type.name if notification.notification_type else None,
                 invitation_id=notification.invitation_id,
                 farm_id=notification.farm_id,
-                reminder_time=notification.reminder_time,
                 status=notification.status.name if notification.status else None
             )
             for notification in notifications
