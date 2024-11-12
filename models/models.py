@@ -180,8 +180,6 @@ class Status(Base):
         Identificador único del estado.
     name : str
         Nombre del estado.
-    description : str
-        Descripción del estado.
     status_type_id : int
         Relación con el tipo de estado.
     """
@@ -189,7 +187,6 @@ class Status(Base):
 
     status_id = Column(Integer, primary_key=True, server_default=Sequence('status_status_id_seq').next_value())
     name = Column(String(45), nullable=False)
-    description = Column(String(255), nullable=True)
     status_type_id = Column(Integer, ForeignKey("status_type.status_type_id"), nullable=False)
 
     # Relación con StatusType
@@ -370,8 +367,6 @@ class Notification(Base):
         Identificador de la invitación relacionada, si aplica.
     notification_type_id : int
         Tipo de notificación.
-    reminder_time : datetime
-        Tiempo para el recordatorio de la notificación.
     farm_id : int
         Identificador de la finca relacionada, si aplica.
     status_id : int
@@ -385,9 +380,9 @@ class Notification(Base):
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
     invitation_id = Column(Integer, ForeignKey('invitation.invitation_id'), nullable=True)
     notification_type_id = Column(Integer, ForeignKey('notification_type.notification_type_id'), nullable=True)
-    reminder_time = Column(DateTime, nullable=True)
     farm_id = Column(Integer, ForeignKey('farm.farm_id'), nullable=True)
     status_id = Column(Integer, ForeignKey('status.status_id'), nullable=True)
+
 
     # Relaciones
     user = relationship("User", foreign_keys=[user_id], back_populates="notifications")
@@ -441,10 +436,10 @@ class Plot(Base):
 
     cultural_work_tasks = relationship("CulturalWorkTask", back_populates="plot")
 
-# Modelo para CoffeeVariety
+# Modelo actualizado para CoffeeVariety
 class CoffeeVariety(Base):
     """
-    Representa una variedad de café.
+    Representa una variedad de café con los atributos mínimos necesarios.
 
     Atributos:
     ----------
@@ -452,42 +447,11 @@ class CoffeeVariety(Base):
         Identificador único de la variedad de café.
     name : str
         Nombre de la variedad de café.
-    description : str
-        Descripción de la variedad de café.
-    rust_resistant : bool
-        Indica si la variedad es resistente a la roya.
-    growth_habit : str
-        Hábitos de crecimiento de la variedad.
-    plant_density_sun : float
-        Densidad de plantación en sol (hectáreas por hectárea).
-    plant_density_shade : float
-        Densidad de plantación en sombra (hectáreas por hectárea).
-    production : float
-        Producción esperada (toneladas por hectárea).
-    altitude_min : int
-        Altitud mínima para el cultivo (metros).
-    altitude_max : int
-        Altitud máxima para el cultivo (metros).
-    plant_density_unit_id : int
-        Relación con la unidad de medida para la densidad de plantación.
-    status_id : int
-        Relación con el estado de la variedad de café.
     """
     __tablename__ = 'coffee_variety'
 
-    coffee_variety_id = Column(Integer, primary_key=True, index=True, server_default=Sequence('coffee_variety_coffee_variety_id_seq').next_value())
+    coffee_variety_id = Column(Integer, primary_key=True, index=True, server_default="nextval('coffee_variety_coffee_variety_id_seq')")
     name = Column(String(50), nullable=False)
-    description = Column(String(255), nullable=True)
-    rust_resistant = Column(Boolean, nullable=True)
-    growth_habit = Column(String(50), nullable=True)
-    plant_density_sun = Column(Numeric(10, 2), nullable=True)
-    plant_density_shade = Column(Numeric(10, 2), nullable=True)
-    production = Column(Numeric(10, 2), nullable=True)
-    altitude_min = Column(Integer, nullable=True)
-    altitude_max = Column(Integer, nullable=True)
-    plant_density_unit_id = Column(Integer, ForeignKey('unit_of_measure.unit_of_measure_id'), nullable=True)
-    production_unit_id = Column(Integer, ForeignKey('unit_of_measure.unit_of_measure_id'), nullable=True)
-    altitude_unit_id = Column(Integer, ForeignKey('unit_of_measure.unit_of_measure_id'), nullable=True)
 
     # Relaciones
     plots = relationship("Plot", back_populates="coffee_variety")
@@ -668,14 +632,11 @@ class TransactionType(Base):
         Identificador único del tipo de transacción.
     name : str
         Nombre del tipo de transacción.
-    description : str
-        Descripción del tipo de transacción.
     """
     __tablename__ = 'transaction_type'
 
     transaction_type_id = Column(Integer, primary_key=True, server_default=Sequence('transaction_type_transaction_type_id_seq').next_value())
     name = Column(String(50), nullable=False)
-    description = Column(String(255), nullable=True)
 
     # Relaciones
     categories = relationship("TransactionCategory", back_populates="transaction_type")
