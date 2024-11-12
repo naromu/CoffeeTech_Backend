@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from models.models import (
-    Transaction, TransactionCategory, TransactionType, Plot, Farm, UserRoleFarm, Status, RolePermission, Permission
+    Transaction, TransactionCategory, TransactionType, Plot,User, Farm, UserRoleFarm, Status, RolePermission, Permission
 )
 from utils.security import verify_session_token
 from dataBase import get_db_session
@@ -26,6 +26,8 @@ class FinancialReportRequest(BaseModel):
     plot_ids: conlist(int) = Field(..., description="Lista de IDs de lotes (puede ser un solo ID)")
     fechaInicio: date = Field(..., description="Fecha de inicio del periodo")
     fechaFin: date = Field(..., description="Fecha de fin del periodo")
+    include_transaction_history: bool = Field(False, description="Indica si se debe incluir el historial de transacciones")
+
 
 class FinancialCategoryBreakdown(BaseModel):
     category_name: str
@@ -47,6 +49,16 @@ class FarmFinancialSummary(BaseModel):
     ingresos_por_categoria: List[FinancialCategoryBreakdown]
     gastos_por_categoria: List[FinancialCategoryBreakdown]
 
+
+class TransactionHistoryItem(BaseModel):
+    date: date
+    plot_name: str
+    farm_name: str
+    transaction_type: str
+    transaction_category: str
+    creator_name: str
+    value: float
+    
 class FinancialReportResponse(BaseModel):
     finca_nombre: str
     lotes_incluidos: List[str]
@@ -54,6 +66,8 @@ class FinancialReportResponse(BaseModel):
     plot_financials: List[PlotFinancialData]
     farm_summary: FarmFinancialSummary
     analysis: Optional[str] = None
+    transaction_history: Optional[List[TransactionHistoryItem]] = None
+
 
 # Endpoint para generar el reporte financiero
 @router.post("/financial-report")
@@ -152,8 +166,8 @@ def financial_report(
         
         for txn in transactions:
             plot_id = txn.plot_id
-            txn_type = db.query(TransactionType).filter(TransactionType.transaction_type_id == txn.transaction_type_id).first()
-            txn_category = db.query(TransactionCategory).filter(TransactionCategory.transaction_category_id == txn.transaction_category_id).first()
+            txn_type = txn.transaction_type
+            txn_category = txn.transaction_category
             
             if not txn_type or not txn_category:
                 logger.warning(f"Transacción con ID {txn.transaction_id} tiene tipo o categoría inválidos")
@@ -162,12 +176,12 @@ def financial_report(
             category = txn_category.name
             monto = float(txn.value)
             
-            if txn_type.name.lower() in ["ingreso", "income", "revenue"]:  # Asegúrate de que los nombres coincidan
+            if txn_type.name.lower() in ["ingreso", "income", "revenue"]:
                 plot_financials[plot_id]["ingresos"] += monto
                 plot_financials[plot_id]["ingresos_por_categoria"][category] += monto
                 farm_ingresos += monto
                 farm_ingresos_categorias[category] += monto
-            elif txn_type.name.lower() in ["gasto", "expense", "cost"]:  # Asegúrate de que los nombres coincidan
+            elif txn_type.name.lower() in ["gasto", "expense", "cost"]:
                 plot_financials[plot_id]["gastos"] += monto
                 plot_financials[plot_id]["gastos_por_categoria"][category] += monto
                 farm_gastos += monto
@@ -211,6 +225,31 @@ def financial_report(
             farm_summary=farm_summary,
             analysis=None  # Puedes agregar lógica para generar un análisis automático si lo deseas
         )
+        
+        # Agregar historial de transacciones si se solicita
+        if request.include_transaction_history:
+            transaction_history = []
+            for txn in transactions:
+                try:
+                    # Obtener el nombre del creador consultando la tabla User
+                    creator = db.query(User).filter(User.user_id == txn.creador_id).first()
+                    creator_name = creator.name if creator else "Desconocido"
+
+                    history_item = TransactionHistoryItem(
+                        date=txn.transaction_date,
+                        plot_name=txn.plot.name,
+                        farm_name=txn.plot.farm.name,
+                        transaction_type=txn.transaction_type.name,
+                        transaction_category=txn.transaction_category.name,
+                        creator_name=creator_name,
+                        value=float(txn.value)
+                    )
+                    transaction_history.append(history_item)
+                except Exception as e:
+                    logger.warning(f"Error al procesar la transacción ID {txn.transaction_id}: {str(e)}")
+                    continue  # Omitir transacciones con errores
+            report_response.transaction_history = transaction_history
+
         
         logger.info(f"Reporte financiero generado para el usuario {user.user_id} en la finca '{farm.name}'")
         

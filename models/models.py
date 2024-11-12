@@ -716,6 +716,8 @@ class Transaction(Base):
     transaction_date = Column(Date, nullable=False)
     status_id = Column(Integer, ForeignKey('status.status_id'), nullable=False)
     value = Column(BigInteger, nullable=False)
+    creador_id = Column(Integer, nullable=False)  # Nueva columna con valor predeterminado 2
+
 
     # Relaciones
     plot = relationship("Plot")

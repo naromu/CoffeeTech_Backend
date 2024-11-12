@@ -152,7 +152,8 @@ def create_transaction(
             description=request.description,
             value=request.value,
             transaction_date=request.transaction_date,
-            status_id=active_status.status_id
+            status_id=active_status.status_id,
+            creador_id=user.user_id
         )
         db.add(new_transaction)
         db.commit()
@@ -169,7 +170,7 @@ def create_transaction(
             value=new_transaction.value,
             transaction_date=new_transaction.transaction_date,
             status=active_status.name
-        )
+            )
         
         # Convertir a JSON serializable usando jsonable_encoder
         response_dict = jsonable_encoder(response_data.dict())
