@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from models.models import (
-    Transaction, TransactionCategory, TransactionType, Plot,User, Farm, UserRoleFarm, Status, RolePermission, Permission
+    Transaction, TransactionCategory, TransactionType, Recommendation, Plot,User,CulturalWorkTask,CulturalWork,HealthCheck, Farm, UserRoleFarm, Status, RolePermission, Permission
 )
 from utils.security import verify_session_token
 from dataBase import get_db_session
@@ -68,6 +68,23 @@ class FinancialReportResponse(BaseModel):
     analysis: Optional[str] = None
     transaction_history: Optional[List[TransactionHistoryItem]] = None
 
+
+class DetectionHistoryRequest(BaseModel):
+    plot_ids: conlist(int) = Field(..., description="Lista de IDs de lotes (puede ser uno o varios)")
+    fechaInicio: date = Field(..., description="Fecha de inicio del periodo")
+    fechaFin: date = Field(..., description="Fecha de fin del periodo")
+
+class DetectionHistoryItem(BaseModel):
+    date: date
+    person_name: str
+    detection: str
+    recommendation: str
+    cultural_work: str
+    lote_name: str
+    farm_name: str
+
+class DetectionHistoryResponse(BaseModel):
+    detections: List[DetectionHistoryItem]
 
 # Endpoint para generar el reporte financiero
 @router.post("/financial-report")
@@ -258,3 +275,107 @@ def financial_report(
     except Exception as e:
         logger.error(f"Error al generar el reporte financiero: {str(e)}")
         return create_response("error", f"Error al generar el reporte financiero: {str(e)}", status_code=500)
+    
+
+@router.post("/detection-report", response_model=DetectionHistoryResponse)
+def detection_history(
+    request: DetectionHistoryRequest,
+    session_token: str,
+    db: Session = Depends(get_db_session)
+):
+    # 1. Verificar que el session_token esté presente
+    if not session_token:
+        logger.warning("No se proporcionó el token de sesión en la cabecera")
+        return create_response("error", "Token de sesión faltante", status_code=401)
+    
+    # 2. Verificar el token de sesión
+    user = verify_session_token(session_token, db)
+    if not user:
+        logger.warning("Token de sesión inválido o usuario no encontrado")
+        return session_token_invalid_response()
+    
+    try:
+        # 3. Obtener los lotes seleccionados
+        plots = db.query(Plot).filter(Plot.plot_id.in_(request.plot_ids)).all()
+        if not plots:
+            logger.warning("No se encontraron lotes con los IDs proporcionados")
+            return create_response("error", "No se encontraron lotes con los IDs proporcionados", status_code=404)
+        
+        # 4. Obtener las fincas asociadas a los lotes
+        farm_ids = {plot.farm_id for plot in plots}
+        farms = db.query(Farm).filter(Farm.farm_id.in_(farm_ids)).all()
+        if not farms:
+            logger.warning("No se encontraron fincas asociadas a los lotes proporcionados")
+            return create_response("error", "No se encontraron fincas asociadas a los lotes proporcionados", status_code=404)
+        
+        # 5. Verificar que el usuario esté asociado con todas las fincas y tenga permisos
+        active_urf_status = get_status(db, "Activo", "user_role_farm")
+        if not active_urf_status:
+            logger.error("Estado 'Activo' para user_role_farm no encontrado")
+            return create_response("error", "Estado 'Activo' para user_role_farm no encontrado", status_code=500)
+        
+        # Verificar permisos para cada finca
+        for farm in farms:
+            user_role_farm = db.query(UserRoleFarm).filter(
+                UserRoleFarm.user_id == user.user_id,
+                UserRoleFarm.farm_id == farm.farm_id,
+                UserRoleFarm.status_id == active_urf_status.status_id
+            ).first()
+            
+            if not user_role_farm:
+                logger.warning(f"El usuario {user.user_id} no está asociado con la finca {farm.farm_id}")
+                return create_response("error", f"No tienes permisos para ver reportes de la finca '{farm.name}'", status_code=403)
+            
+            # Verificar permiso 'read_health_checks_report'
+            role_permission = db.query(RolePermission).join(Permission).filter(
+                RolePermission.role_id == user_role_farm.role_id,
+                Permission.name == "read_health_checks_report"
+            ).first()
+            
+            if not role_permission:
+                logger.warning(f"El rol {user_role_farm.role_id} del usuario no tiene permiso para ver reportes de salud")
+                return create_response("error", "No tienes permiso para ver reportes de salud", status_code=403)
+        
+        # 6. Obtener el estado 'Aceptado' para Deteccion
+        accepted_status = get_status(db, "Aceptado", "Deteccion")
+        if not accepted_status:
+            logger.error("Estado 'Aceptado' para Deteccion no encontrado")
+            return create_response("error", "Estado 'Aceptado' para Deteccion no encontrado", status_code=500)
+        
+        # 7. Consultar las detecciones dentro del rango de fechas y con estado 'Aceptado' y tipo 'Deteccion'
+        detections = db.query(HealthCheck).join(CulturalWorkTask).join(Plot).join(Farm).join(Recommendation).filter(
+            CulturalWorkTask.plot_id.in_(request.plot_ids),
+            HealthCheck.check_date >= request.fechaInicio,
+            HealthCheck.check_date <= request.fechaFin,
+            HealthCheck.status_id == accepted_status.status_id
+            ).all()
+        
+        # 8. Procesar las detecciones para la respuesta
+        detection_history = []
+        for detection in detections:
+            cultural_work_task = detection.cultural_work_task
+            creator_user = db.query(User).filter(
+                User.user_id == cultural_work_task.owner_user_id
+            ).first()
+            creator_name = creator_user.name if creator_user else "Desconocido"
+            
+            detection_item = DetectionHistoryItem(
+                date=detection.check_date,
+                person_name=creator_name,
+                detection=detection.prediction,
+                recommendation=detection.recommendation.name if detection.recommendation else "Sin recomendación",
+                cultural_work=cultural_work_task.cultural_work.name if cultural_work_task.cultural_work else "Sin tarea cultural",
+                lote_name=cultural_work_task.plot.name if cultural_work_task.plot else "Sin lote",
+                farm_name=cultural_work_task.plot.farm.name if cultural_work_task.plot and cultural_work_task.plot.farm else "Sin finca"
+            )
+            detection_history.append(detection_item)
+        
+        response = DetectionHistoryResponse(detections=detection_history)
+        
+        logger.info(f"Historial de detecciones generado para el usuario {user.user_id}")
+        
+        return create_response("success", "Historial de detecciones generado correctamente", data=jsonable_encoder(response))
+    
+    except Exception as e:
+        logger.error(f"Error al generar el historial de detecciones: {str(e)}")
+        return create_response("error", f"Error al generar el historial de detecciones: {str(e)}", status_code=500)
