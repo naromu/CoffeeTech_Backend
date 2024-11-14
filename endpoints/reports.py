@@ -93,6 +93,15 @@ def financial_report(
     session_token: str,
     db: Session = Depends(get_db_session)
 ):
+    """
+    Genera un reporte financiero detallado de los lotes seleccionados en una finca específica.
+
+    - **request**: Contiene los IDs de los lotes, el rango de fechas y si se debe incluir el historial de transacciones.
+    - **session_token**: Token de sesión del usuario para validar su autenticación.
+    - **db**: Sesión de base de datos proporcionada automáticamente por FastAPI.
+
+    El reporte incluye ingresos, gastos y balance financiero de los lotes y la finca en general.
+    """
     # 1. Verificar que el session_token esté presente
     if not session_token:
         logger.warning("No se proporcionó el token de sesión en la cabecera")
@@ -283,6 +292,15 @@ def detection_history(
     session_token: str,
     db: Session = Depends(get_db_session)
 ):
+    """
+    Genera un historial de detecciones de salud para los lotes seleccionados.
+
+    - **request**: Contiene los IDs de los lotes y el rango de fechas.
+    - **session_token**: Token de sesión del usuario para validar su autenticación.
+    - **db**: Sesión de base de datos proporcionada automáticamente por FastAPI.
+
+    El historial de detecciones incluye información detallada de las detecciones aceptadas en los lotes especificados.
+    """
     # 1. Verificar que el session_token esté presente
     if not session_token:
         logger.warning("No se proporcionó el token de sesión en la cabecera")

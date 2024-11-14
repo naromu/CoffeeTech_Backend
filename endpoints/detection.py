@@ -195,7 +195,18 @@ def detect_disease_deficiency(
     db: Session = Depends(get_db_session)
 ):
     """
-    Crear un historial de detección de enfermedades y deficiencias para múltiples imágenes.
+    Endpoint para la detección de enfermedades y deficiencias en imágenes.
+
+    Este endpoint recibe una solicitud con varias imágenes y utiliza modelos de aprendizaje automático para identificar enfermedades o deficiencias en las plantas.
+    
+    - **session_token**: Token de sesión para autenticar al usuario.
+    - **request**: Objeto que contiene la información de las imágenes y el ID de la tarea de labor cultural asociada.
+
+    **Response**
+    - **200**: Retorna una lista de predicciones con el ID de cada predicción, la recomendación y la confianza del modelo.
+    - **401**: Token de sesión faltante o inválido.
+    - **400**: Error en los estados requeridos o permisos insuficientes.
+    - **500**: Error interno del servidor al procesar imágenes o guardar en la base de datos.
     """
     # 1. Verificar que el session_token esté presente
     if not session_token:
@@ -364,7 +375,18 @@ def detect_maturity(
     db: Session = Depends(get_db_session)
 ):
     """
-    Detectar el estado de maduración de frutas en múltiples imágenes y proporcionar recomendaciones basadas en las detecciones.
+    Endpoint para detectar el estado de maduración de frutas en imágenes.
+
+    Este endpoint recibe imágenes y utiliza un modelo de aprendizaje automático para determinar el estado de maduración de las frutas y proporcionar recomendaciones.
+    
+    - **session_token**: Token de sesión para autenticar al usuario.
+    - **request**: Objeto que contiene la información de las imágenes y el ID de la tarea de labor cultural asociada.
+
+    **Response**
+    - **200**: Retorna una lista de predicciones con el ID de cada predicción, el estado de maduración y la recomendación.
+    - **401**: Token de sesión faltante o inválido.
+    - **400**: Error en los estados requeridos o permisos insuficientes.
+    - **500**: Error interno del servidor al procesar imágenes o guardar en la base de datos.
     """
     # 1. Verificar que el session_token esté presente
     if not session_token:
@@ -614,8 +636,11 @@ def accept_predictions(
     db: Session = Depends(get_db_session)
 ):
     """
-    Aceptar predicciones previamente generadas y actualizarlas a estado 'Aceptado'.
-    Además, cambiar el estado de la tarea de labor cultural asociada a 'Terminado'.
+    Acepta las predicciones previamente generadas, actualizándolas a estado 'Aceptado' y
+    cambiando el estado de la tarea cultural asociada a 'Terminado'.
+    
+    - **request.prediction_ids**: Lista de IDs de las predicciones a aceptar.
+    - **session_token**: Token de sesión del usuario realizando la acción.
     """
     # 1. Verificar que el session_token esté presente
     if not session_token:
@@ -704,8 +729,12 @@ def unaccept_predictions(
     db: Session = Depends(get_db_session)
 ):
     """
-    Desaceptar predicciones previamente aceptadas eliminándolas definitivamente de la base de datos.
+    Desacepta y elimina las predicciones previamente aceptadas de la base de datos.
+    
+    - **request.prediction_ids**: Lista de IDs de las predicciones a desaceptar.
+    - **session_token**: Token de sesión del usuario realizando la acción.
     """
+    
     # 1. Verificar que el session_token esté presente
     if not session_token:
         logger.warning("No se proporcionó el token de sesión en la cabecera")
@@ -758,8 +787,13 @@ def list_detections(
     db: Session = Depends(get_db_session)
 ):
     """
-    Lista las detecciones realizadas con estado 'Aceptado' y tipo 'Deteccion' para un lote específico.
-    Devuelve el usuario que realizó la detección, la fecha, el resultado y la recomendación.
+    Obtiene las detecciones realizadas en un lote específico con estado 'Aceptado' y tipo 'Deteccion'.
+    
+    - **request.plot_id**: ID del lote para el cual se listan las detecciones.
+    - **session_token**: Token de sesión del usuario que realiza la consulta.
+    
+    Returns:
+        - Lista de detecciones, con el colaborador que realizó la detección, la fecha y la recomendación.
     """
     logger.info("Iniciando la lista de detecciones para plot_id: %s", request.plot_id)
     

@@ -64,6 +64,16 @@ def create_transaction(
     session_token: str,
     db: Session = Depends(get_db_session)
 ):
+    """
+    Crear una nueva transacción para un lote en una finca.
+
+    - **farm_id**: ID de la finca
+    - **plot_id**: ID del lote
+    - **transaction_type**: Tipo de transacción (Ej. 'ingreso', 'gasto')
+    - **category**: Categoría de la transacción (Ej. 'fertilizante', 'mano de obra')
+    - **value**: Valor monetario de la transacción
+    - **description**: Descripción detallada de la transacción
+    """
     # 1. Verificar que el session_token esté presente
     if not session_token:
         logger.warning("No se proporcionó el token de sesión en la cabecera")
@@ -190,6 +200,15 @@ def edit_transaction(
     session_token: str ,
     db: Session = Depends(get_db_session)
 ):
+    """
+    Editar una transacción existente para un lote en una finca.
+
+    - **transaction_id**: ID de la transacción
+    - **transaction_type**: Nuevo tipo de transacción
+    - **category**: Nueva categoría de la transacción
+    - **value**: Nuevo valor monetario de la transacción
+    - **description**: Nueva descripción de la transacción
+    """
     # 1. Verificar que el session_token esté presente
     if not session_token:
         logger.warning("No se proporcionó el token de sesión en la cabecera")
@@ -328,6 +347,12 @@ def delete_transaction(
     session_token: str,
     db: Session = Depends(get_db_session)
 ):
+    """
+    Eliminar una transacción existente para un lote.
+
+    - **transaction_id**: ID de la transacción a eliminar
+    - **session_token**: Token de sesión del usuario para verificar permisos y autenticación
+    """
     # 1. Verificar que el session_token esté presente
     if not session_token:
         logger.warning("No se proporcionó el token de sesión en la cabecera")
@@ -400,6 +425,12 @@ def read_transactions(
     session_token: str ,
     db: Session = Depends(get_db_session)
 ):
+    """
+    Obtener la lista de transacciones de un lote específico.
+
+    - **plot_id**: ID del lote del que se desea obtener las transacciones
+    - **session_token**: Token de sesión del usuario para verificar permisos y autenticación
+    """
     # 1. Verificar que el session_token esté presente
     if not session_token:
         logger.warning("No se proporcionó el token de sesión en la cabecera")
