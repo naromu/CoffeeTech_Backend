@@ -463,7 +463,7 @@ def detect_maturity(
     
     # 10. Inicializar contadores globales para las clases
     global_class_count = {class_name: 0 for class_name in class_names_maturity.values()}
-    
+
     # Lista para almacenar detalles por imagen (opcional)
     response_data = []
     image_number = 1
@@ -472,27 +472,27 @@ def detect_maturity(
             # Decodificar la imagen
             image_bytes = decode_base64_image(image_data.image_base64)
             image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-    
+
             # Preprocesar la imagen para el modelo ONNX de maduración
             img_width, img_height = image.size
             processed_image_maturity = preprocess_image_Deteccion(image)
-    
+
             # Ejecutar la inferencia con el modelo ONNX
             inputs = {session_maturity.get_inputs()[0].name: processed_image_maturity}
             outputs = session_maturity.run(None, inputs)
             output = outputs[0][0]  # Extraer la salida para una imagen
-    
+
             # Procesar las detecciones
             Deteccions = []
             class_count = {}
             for Deteccion in output:
                 x_center, y_center, width, height, obj_conf = Deteccion[:5]
                 class_probs = Deteccion[5:]
-    
+
                 # Calcular confianza total y clase
                 confidence = obj_conf * np.max(class_probs)
                 class_id = np.argmax(class_probs)
-    
+
                 # Filtrar por umbral de confianza
                 if confidence > 0.5:
                     # Escalar las coordenadas a la imagen original
@@ -500,37 +500,37 @@ def detect_maturity(
                     y_center_scaled = y_center * img_height / 640
                     width_scaled = width * img_width / 640
                     height_scaled = height * img_height / 640
-    
+
                     # Convertir a coordenadas de esquina
                     x1 = int(x_center_scaled - width_scaled / 2)
                     y1 = int(y_center_scaled - height_scaled / 2)
                     x2 = int(x_center_scaled + width_scaled / 2)
                     y2 = int(y_center_scaled + height_scaled / 2)
-    
+
                     # Añadir a la lista de detecciones
                     Deteccions.append([x1, y1, x2, y2, confidence, class_id])
-    
+
             # Aplicar NMS si hay detecciones
             if Deteccions:
                 boxes = np.array([det[:4] for det in Deteccions])
                 scores = np.array([det[4] for det in Deteccions])
-    
+
                 # Aplicar la función de NMS manual
                 indices = non_max_suppression(boxes, scores, iou_threshold=0.4)
-    
+
                 # Dibujar cajas y contar clases
                 draw = ImageDraw.Draw(image)
                 for i in indices:
                     x1, y1, x2, y2, _, class_id = Deteccions[i]
-    
+
                     # Obtener nombre y color de clase
                     class_name = class_names_maturity.get(class_id, "Unknown")
                     color = class_colors_maturity.get(class_id, (255, 0, 0))
-    
+
                     # Dibujar caja
                     draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
                     draw.text((x1, y1), class_name, fill=color)
-    
+
                     # Contar clases
                     if class_name in class_count:
                         class_count[class_name] += 1
@@ -538,8 +538,7 @@ def detect_maturity(
                     else:
                         class_count[class_name] = 1
                         global_class_count[class_name] += 1
-    
-            # Obtener la predicción final para esta imagen (opcional)
+
             # Obtener la predicción final para esta imagen
             if class_count:
                 predicted_class_image = max(class_count, key=class_count.get)
@@ -549,11 +548,11 @@ def detect_maturity(
             # Ordenar las clases por un orden predefinido de aparición
             ordered_class_names = ["Verde", "Pintón", "Maduro", "Sobremaduro", "No hay granos"]
 
-            # Construir el texto de predicción ordenado
+            # **Corrección: Usar class_count en lugar de global_class_count**
             prediction_text = ', '.join([
-                f"{class_name} = {global_class_count[class_name]}" 
+                f"{class_name} = {class_count[class_name]}" 
                 for class_name in ordered_class_names 
-                if global_class_count.get(class_name, 0) > 0
+                if class_count.get(class_name, 0) > 0
             ]) or "No hay granos"
 
             # Obtener la recomendación para esta imagen

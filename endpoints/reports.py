@@ -372,16 +372,30 @@ def detection_history(
         detection_history = []
         for detection in detections:
             cultural_work_task = detection.cultural_work_task
-            creator_user = db.query(User).filter(
-                User.user_id == cultural_work_task.owner_user_id
-            ).first()
-            creator_name = creator_user.name if creator_user else "Desconocido"
             
+            # Obtener el usuario colaborador
+            collaborator_user = db.query(User).filter(
+                User.user_id == cultural_work_task.collaborator_user_id
+            ).first()
+            collaborator_name = collaborator_user.name if collaborator_user else "Desconocido"
+            
+            
+            PREDICTION_MAPPING = {
+                'nitrogen_N': 'Deficiencia de nitrógeno',
+                'phosphorus_P': 'Deficiencia de fósforo',
+                'potassium_K': 'Deficiencia de potasio',
+                'cercospora': 'Cercospora',
+                'ferrugem': 'Mancha de hierro',
+                'leaf_rust': 'Roya'
+            }
+
+            mapped_prediction = PREDICTION_MAPPING.get(detection.prediction, detection.prediction)
+
             detection_item = DetectionHistoryItem(
                 date=detection.check_date,
-                person_name=creator_name,
-                detection=detection.prediction,
-                recommendation=detection.recommendation.name if detection.recommendation else "Sin recomendación",
+                person_name=collaborator_name,  # Asignar al colaborador
+                detection=mapped_prediction,     # Asignar la predicción mapeada
+                recommendation=detection.recommendation.recommendation if detection.recommendation else "Sin recomendación",
                 cultural_work=cultural_work_task.cultural_work.name if cultural_work_task.cultural_work else "Sin tarea cultural",
                 lote_name=cultural_work_task.plot.name if cultural_work_task.plot else "Sin lote",
                 farm_name=cultural_work_task.plot.farm.name if cultural_work_task.plot and cultural_work_task.plot.farm else "Sin finca"
