@@ -19,7 +19,10 @@ import numpy as np
 import onnxruntime as ort
 import traceback
 from utils.FCM import send_fcm_notification
+from datetime import datetime
+import pytz
 
+colombia_tz = pytz.timezone('America/Bogota')
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO)
@@ -325,10 +328,14 @@ def detect_disease_deficiency(
             # Obtener la recomendación
             recommendation = db.query(Recommendation).filter(Recommendation.name == predicted_class).first()
             recommendation_text = recommendation.recommendation if recommendation else "No se encontró una recomendación para esta clase."
-            
+            colombia_tz = pytz.timezone('America/Bogota')
+
+            # Obtén la fecha y hora actual en UTC y conviértela a hora de Colombia
+            now_in_colombia = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(colombia_tz)
+
             # Crear una instancia de HealthCheck con estado 'Pendiente'
             new_health_check = HealthCheck(
-                check_date=datetime.utcnow(),
+                check_date=now_in_colombia,
                 cultural_work_tasks_id=request.cultural_work_tasks_id,
                 recommendation_id=recommendation.recommendation_id if recommendation else None,
                 prediction=predicted_class,
@@ -566,10 +573,14 @@ def detect_maturity(
                 )
 
             recommendation_text = recommendation.recommendation
+            colombia_tz = pytz.timezone('America/Bogota')
+
+            # Obtén la fecha y hora actual en UTC y conviértela a hora de Colombia
+            now_in_colombia = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(colombia_tz)
 
             # Crear una instancia de HealthCheck con estado 'Pendiente'
             new_health_check = HealthCheck(
-                check_date=datetime.utcnow(),
+                check_date=now_in_colombia,  # Hora en Colombia
                 cultural_work_tasks_id=request.cultural_work_tasks_id,
                 recommendation_id=recommendation.recommendation_id,  # Garantizado que no es None
                 prediction=prediction_text,
