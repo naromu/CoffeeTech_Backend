@@ -346,11 +346,22 @@ def detect_disease_deficiency(
             db.add(new_health_check)
             db.flush()  # Obtener el ID sin hacer commit aún
             
+            
+            PREDICTION_MAPPING = {
+    'nitrogen_N': 'Deficiencia de nitrógeno',
+    'phosphorus_P': 'Deficiencia de fósforo',
+    'potassium_K': 'Deficiencia de potasio',
+    'cercospora': 'Cercospora',
+    'ferrugem': 'Mancha de hierro',
+    'leaf_rust': 'Roya'
+}
+            mapped_prediction = PREDICTION_MAPPING.get(predicted_class, predicted_class)
+
             # Agregar al response
             response_data.append({
                 "prediction_id": new_health_check.health_checks_id,  # ID de la predicción
                 "imagen_numero": image_number,
-                "prediccion": predicted_class,
+                "prediccion": mapped_prediction,
                 "recomendacion": recommendation_text,
                 "modelo_utilizado": model_used,
                 "confianza": confidence_score
